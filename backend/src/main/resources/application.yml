@@ -1,7 +1,18 @@
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        same-site: lax
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: jdbc:postgresql://localhost:5432/pawtrack
     username: pawtrack

@@ -1,7 +1,10 @@
-export type CatStatus = 'NORMAL' | 'UNDER_OBSERVATION' | 'SICK' | 'ADOPTABLE' | 'ADOPTED'
+export type CatHealthStatus = 'NORMAL' | 'UNDER_OBSERVATION' | 'SICK'
+export type UserRole = 'STAFF' | 'ADOPTER'
+export type CurrentUser = { id: number; email: string; displayName: string; role: UserRole }
+export type CatAdoptionStatus = 'AVAILABLE' | 'ADOPTED'
 export type AdoptionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type Cat = {
-  id: number; name: string; status: CatStatus; imageUrl: string | null
+  id: number; name: string; healthStatus: CatHealthStatus; adoptionStatus: CatAdoptionStatus; imageUrl: string | null
   streamUrl: string | null; createdAt: string; updatedAt: string
 }
 export type CatDetail = Cat & { temperatureC: number | null; hasActiveAlert: boolean }
@@ -9,7 +12,7 @@ export type Application = {
   id: number; catId: number; catName: string; adopterName: string; adopterEmail: string
   status: AdoptionStatus; notes: string | null; createdAt: string; updatedAt: string
 }
-export type ApplicationInput = { catId: number; adopterName: string; adopterEmail: string; notes: string }
+export type ApplicationInput = { catId: number; notes: string }
 
 export type AlertStatus = 'OPEN' | 'CLOSED'
 export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH'

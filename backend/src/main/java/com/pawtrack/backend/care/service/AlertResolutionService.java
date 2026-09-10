@@ -8,6 +8,7 @@ import com.pawtrack.backend.care.api.dto.AlertResolutionResponse;
 import com.pawtrack.backend.care.domain.CareRecord;
 import com.pawtrack.backend.care.repo.CareRecordRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -51,10 +52,9 @@ public class AlertResolutionService {
         // Flush includes the alert update, so the remaining-open query sees CLOSED.
         careRecords.saveAndFlush(care);
 
-        // Temporary bridge while Cat.status mixes care and adoption state.
         if (!alerts.existsByCatIdAndStatus(catId, AlertStatus.OPEN)
-                && "UNDER_OBSERVATION".equals(cat.getStatus())) {
-            cat.setStatus("NORMAL");
+                && cat.getHealthStatus() == CatHealthStatus.UNDER_OBSERVATION) {
+            cat.setHealthStatus(CatHealthStatus.NORMAL);
         }
         return new AlertResolutionResponse(alertId, catId, alert.getStatus(), resolvedAt, care.getId());
     }

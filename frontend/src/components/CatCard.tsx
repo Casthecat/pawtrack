@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import type { Cat } from '@/api/types'
 import { imageSource } from '@/api/axiosInstance'
-import { StatusBadge } from './StatusBadge'
+import { CatStatusBadges } from './CatStatusBadges'
 
 export function CatPortrait({ cat }: { cat: Cat }) {
   const [failed, setFailed] = useState(false)
@@ -18,9 +18,9 @@ export function CatPortrait({ cat }: { cat: Cat }) {
 export function CatCard({ cat }: { cat: Cat }) {
   return <Link to={`/cats/${cat.id}`} className="cat-card" aria-label={`Meet ${cat.name}`}>
     <CatPortrait cat={cat} />
-    <div className="cat-card-body"><StatusBadge status={cat.status} />
+    <div className="cat-card-body"><CatStatusBadges cat={cat} />
       <div className="cat-card-title"><h3>{cat.name}</h3><ArrowUpRight size={22} /></div>
-      <p>{cat.status === 'ADOPTED' ? 'A happy new chapter has started.' : 'Get to know your potential companion.'}</p>
+      <p>{cat.adoptionStatus === 'ADOPTED' ? 'A happy new chapter has started.' : 'Get to know your potential companion.'}</p>
     </div>
   </Link>
 }

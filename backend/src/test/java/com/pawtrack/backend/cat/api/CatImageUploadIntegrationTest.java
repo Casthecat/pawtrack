@@ -3,6 +3,7 @@ package com.pawtrack.backend.cat.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -48,21 +50,23 @@ class CatImageUploadIntegrationTest {
     @BeforeEach
     void ensureUploadDirectory() throws Exception {
         Files.createDirectories(Paths.get("uploads"));
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity())
+                .defaultRequest(com.pawtrack.backend.support.StaffMvcTestConfiguration.staffRequest()).build();
     }
 
     @Test
     void uploadImage_storesFile_updatesEntity_and_servesStatic() throws Exception {
 
         Cat cat = new Cat("Kumo");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
         Cat savedCat = catRepository.save(cat);
 
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "test.jpg",
                 "image/jpeg",
-                new byte[]{1, 2, 3, 4}
+                com.pawtrack.backend.support.TestImages.image("jpeg")
         );
 
         MvcResult result = mockMvc.perform(
@@ -71,6 +75,9 @@ class CatImageUploadIntegrationTest {
                                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 )
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.healthStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.adoptionStatus").value("AVAILABLE"))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString();

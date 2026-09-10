@@ -2,6 +2,7 @@ package com.pawtrack.backend.cat.api;
 
 import com.pawtrack.backend.alert.service.AlertService;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.service.CatService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -15,8 +16,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@org.springframework.context.annotation.Import(com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class)
+@com.pawtrack.backend.support.StaffRegression
 @WebMvcTest(controllers = CatController.class)
 class CatControllerWebMvcTest {
+    @MockBean org.springframework.security.core.userdetails.UserDetailsService identityUsers;
 
     @Autowired
     private MockMvc mockMvc;
@@ -30,14 +34,16 @@ class CatControllerWebMvcTest {
     @Test
     void getById_returnsCatResponse() throws Exception {
         Cat cat = new Cat("Mochi");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
 
         when(catService.getById(1L)).thenReturn(cat);
 
         mockMvc.perform(get("/api/cats/{id}", 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Mochi"))
-                .andExpect(jsonPath("$.status").value("NORMAL"));
+                .andExpect(jsonPath("$.healthStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.adoptionStatus").value("AVAILABLE"))
+                .andExpect(jsonPath("$.status").doesNotExist());
     }
 
     @Test

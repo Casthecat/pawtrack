@@ -1,5 +1,7 @@
 package com.pawtrack.backend.care.api;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
@@ -10,6 +12,8 @@ import com.pawtrack.backend.care.domain.CareRecordType;
 import com.pawtrack.backend.care.repo.CareRecordRepository;
 import com.pawtrack.backend.care.service.AlertResolutionService;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
 import com.pawtrack.backend.healthdata.service.HealthDataService;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:alert-resolution;DB_CLOSE_DELAY=-1")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -50,6 +56,7 @@ class AlertResolutionIntegrationTest {
     private static final String BODY = """
             {"careType":"CHECKUP","note":"Temperature rechecked; resting comfortably."}
             """;
+    @Autowired UserAccountRepository accounts;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired Environment environment;
@@ -71,7 +78,7 @@ class AlertResolutionIntegrationTest {
         observations.deleteAllInBatch();
         cats.deleteAllInBatch();
         cat = new Cat("Nori");
-        cat.setStatus("UNDER_OBSERVATION");
+        cat.setHealthStatus(CatHealthStatus.UNDER_OBSERVATION);
         cat = cats.saveAndFlush(cat);
     }
 
@@ -111,7 +118,7 @@ class AlertResolutionIntegrationTest {
         Alert alert = alert(AlertType.FEVER);
         apply(409);
         resolve(alert.getId());
-        assertEquals("NORMAL", statusOfCat());
+        assertEquals(CatHealthStatus.NORMAL, statusOfCat());
         apply(201);
     }
 
@@ -120,18 +127,23 @@ class AlertResolutionIntegrationTest {
         Alert fever = alert(AlertType.FEVER);
         alert(AlertType.LOW_ACTIVITY);
         resolve(fever.getId());
-        assertEquals("UNDER_OBSERVATION", statusOfCat());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, statusOfCat());
         assertTrue(alerts.existsByCatIdAndStatus(cat.getId(), AlertStatus.OPEN));
         apply(409);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADOPTED", "SICK", "ADOPTABLE", "NORMAL", "MANUAL_HOLD"})
-    void preservesEveryOtherExplicitStatus(String initialStatus) throws Exception {
-        cat.setStatus(initialStatus);
+    @CsvSource({"AVAILABLE,NORMAL,NORMAL", "AVAILABLE,UNDER_OBSERVATION,NORMAL", "AVAILABLE,SICK,SICK",
+            "ADOPTED,NORMAL,NORMAL", "ADOPTED,UNDER_OBSERVATION,NORMAL", "ADOPTED,SICK,SICK"})
+    void resolvesHealthIndependentlyOfAdoption(CatAdoptionStatus adoptionStatus,
+                                              CatHealthStatus initialHealth, CatHealthStatus expectedHealth) throws Exception {
+        cat.setAdoptionStatus(adoptionStatus);
+        cat.setHealthStatus(initialHealth);
         cats.saveAndFlush(cat);
         resolve(alert(AlertType.FEVER).getId());
-        assertEquals(initialStatus, statusOfCat());
+        assertEquals(expectedHealth, statusOfCat());
+        assertEquals(adoptionStatus, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
+        assertEquals(1, careRecords.count());
     }
 
     @Test
@@ -157,7 +169,7 @@ class AlertResolutionIntegrationTest {
                 .andExpect(status().isConflict());
         assertEquals(0, careRecords.count());
         assertNull(alerts.findById(closed.getId()).orElseThrow().getResolvedAt());
-        assertEquals("UNDER_OBSERVATION", statusOfCat());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, statusOfCat());
     }
 
     @Test
@@ -167,14 +179,14 @@ class AlertResolutionIntegrationTest {
         assertEquals(1, alerts.count());
         Alert first = alerts.findAll().getFirst();
         resolve(first.getId());
-        assertEquals("NORMAL", statusOfCat());
+        assertEquals(CatHealthStatus.NORMAL, statusOfCat());
         health.create(cat.getId(), null, new BigDecimal("40.1"), 1);
         assertEquals(2, alerts.count());
         assertEquals(AlertStatus.CLOSED, alerts.findById(first.getId()).orElseThrow().getStatus());
         Alert open = alerts.findLatestOpenByCatAndType(cat.getId(), AlertType.FEVER).orElseThrow();
         assertNotEquals(first.getId(), open.getId());
         assertNull(open.getResolvedAt());
-        assertEquals("UNDER_OBSERVATION", statusOfCat());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, statusOfCat());
         apply(409);
     }
 
@@ -202,7 +214,7 @@ class AlertResolutionIntegrationTest {
     @Test
     void removedCloseEndpointCannotBypassWorkflow() throws Exception {
         Alert alert = alert(AlertType.FEVER);
-        mvc.perform(patch("/api/alerts/{id}/close", alert.getId())).andExpect(status().isNotFound());
+        mvc.perform(patch("/api/alerts/{id}/close", alert.getId())).andExpect(status().isForbidden());
         assertEquals(AlertStatus.OPEN, alerts.findById(alert.getId()).orElseThrow().getStatus());
         assertEquals(0, careRecords.count());
     }
@@ -212,14 +224,14 @@ class AlertResolutionIntegrationTest {
         Alert alert = alert(AlertType.FEVER);
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             resolution.resolve(alert.getId(), request());
-            assertEquals("NORMAL", statusOfCat());
+            assertEquals(CatHealthStatus.NORMAL, statusOfCat());
             tx.setRollbackOnly();
         });
         Alert unchanged = alerts.findById(alert.getId()).orElseThrow();
         assertEquals(AlertStatus.OPEN, unchanged.getStatus());
         assertNull(unchanged.getResolvedAt());
         assertEquals(0, careRecords.count());
-        assertEquals("UNDER_OBSERVATION", statusOfCat());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, statusOfCat());
     }
 
     @Test
@@ -240,7 +252,7 @@ class AlertResolutionIntegrationTest {
             assertTrue(outcomes.contains(409));
         }
         assertEquals(1, careRecords.count());
-        assertEquals("NORMAL", statusOfCat());
+        assertEquals(CatHealthStatus.NORMAL, statusOfCat());
     }
 
     private int compete(Long alertId, CountDownLatch ready, CountDownLatch start) throws Exception {
@@ -281,7 +293,7 @@ class AlertResolutionIntegrationTest {
             }
         }
         assertEquals(1, careRecords.count());
-        assertEquals("NORMAL", statusOfCat());
+        assertEquals(CatHealthStatus.NORMAL, statusOfCat());
     }
 
     private void assertInvalid(String body) throws Exception {
@@ -292,7 +304,7 @@ class AlertResolutionIntegrationTest {
         assertEquals(AlertStatus.OPEN, alerts.findById(alert.getId()).orElseThrow().getStatus());
         assertNull(alerts.findById(alert.getId()).orElseThrow().getResolvedAt());
         assertEquals(0, careRecords.count());
-        assertEquals("UNDER_OBSERVATION", statusOfCat());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, statusOfCat());
     }
 
     private Alert alert(AlertType type) {
@@ -310,13 +322,13 @@ class AlertResolutionIntegrationTest {
     }
 
     private void apply(int expectedStatus) throws Exception {
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON).content("""
                         {"catId":%d,"adopterName":"Alex","adopterEmail":"alex@example.com"}
                         """.formatted(cat.getId())))
                 .andExpect(status().is(expectedStatus));
     }
 
-    private String statusOfCat() { return cats.findById(cat.getId()).orElseThrow().getStatus(); }
+    private CatHealthStatus statusOfCat() { return cats.findById(cat.getId()).orElseThrow().getHealthStatus(); }
 
     private AlertResolutionRequest request() {
         return new AlertResolutionRequest(CareRecordType.CHECKUP, "Temperature rechecked.");

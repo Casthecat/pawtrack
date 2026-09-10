@@ -4,6 +4,8 @@ import com.pawtrack.backend.adoption.domain.AdoptionApplication;
 import com.pawtrack.backend.adoption.domain.AdoptionStatus;
 import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +32,7 @@ class AdoptionFlowIntegrationTest {
     @Test
     void approveAndReject_flow_updatesStatusCorrectly() {
         Cat cat = new Cat("Nori");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
         Cat savedCat = catRepository.save(cat);
 
         AdoptionApplication pending = new AdoptionApplication();
@@ -46,7 +48,7 @@ class AdoptionFlowIntegrationTest {
         assertEquals(AdoptionStatus.APPROVED, approved.getStatus());
 
         Cat adoptedCat = catRepository.findById(savedCat.getId()).orElseThrow();
-        assertEquals("ADOPTED", adoptedCat.getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, adoptedCat.getAdoptionStatus());
 
         AdoptionApplication rejected = new AdoptionApplication();
         rejected.setCat(adoptedCat);
@@ -61,7 +63,7 @@ class AdoptionFlowIntegrationTest {
         assertEquals(AdoptionStatus.REJECTED, rejectedResult.getStatus());
 
         Cat unchangedCat = catRepository.findById(savedCat.getId()).orElseThrow();
-        assertEquals("ADOPTED", unchangedCat.getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, unchangedCat.getAdoptionStatus());
     }
 
 }

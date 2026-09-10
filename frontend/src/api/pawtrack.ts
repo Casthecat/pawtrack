@@ -8,6 +8,7 @@ export const api = {
   cats: async () => (await axiosInstance.get<Cat[]>('/api/cats')).data,
   cat: async (id: string) => (await axiosInstance.get<CatDetail>(`/api/cats/${id}/dashboard`)).data,
   createCat: async (name: string) => (await axiosInstance.post<Cat>('/api/cats', { name })).data,
+  myApplications: async () => (await axiosInstance.get<Application[]>('/api/me/adoptions')).data,
   apply: async (input: ApplicationInput) => (await axiosInstance.post<Application>('/api/adoptions', input)).data,
   applications: async (status?: AdoptionStatus) => (await axiosInstance.get<Application[]>('/api/adoptions', { params: { status } })).data,
   application: async (id: string) => (await axiosInstance.get<Application>(`/api/adoptions/${id}`)).data,

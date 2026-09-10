@@ -6,7 +6,6 @@ import com.pawtrack.backend.alert.service.AlertService;
 import com.pawtrack.backend.cat.api.dto.CatCreateRequest;
 import com.pawtrack.backend.cat.api.dto.CatDetailResponse;
 import com.pawtrack.backend.cat.api.dto.CatResponse;
-import com.pawtrack.backend.cat.api.dto.UpdateCatStatusRequest;
 import com.pawtrack.backend.cat.api.mapper.CatMapper;
 import com.pawtrack.backend.cat.domain.Cat;
 import com.pawtrack.backend.cat.service.CatService;
@@ -55,15 +54,6 @@ public class CatController {
     @Operation(summary = "Get cat dashboard data")
     public CatDetailResponse getDashboard(@PathVariable Long id) {
         return catService.getDashboard(id);
-    }
-
-    @PatchMapping("/{id}/status")
-    @Operation(summary = "Update cat status")
-    public CatResponse updateStatus(
-            @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody UpdateCatStatusRequest req
-    ) {
-        return CatMapper.toResponse(catService.updateStatus(id, req.getStatus()));
     }
 
     @PostMapping("/{id}/upload-image")

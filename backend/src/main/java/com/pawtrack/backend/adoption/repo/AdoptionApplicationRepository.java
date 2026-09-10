@@ -18,6 +18,9 @@ public interface AdoptionApplicationRepository extends JpaRepository<AdoptionApp
     @Query("select a.cat.id from AdoptionApplication a where a.id = :id")
     Optional<Long> findCatIdByApplicationId(@Param("id") Long id);
 
-    boolean existsByCatIdAndAdopterEmailIgnoreCaseAndStatus(Long catId, String email, AdoptionStatus status);
+    @Query("select a from AdoptionApplication a join fetch a.cat where a.adopterAccount.id = :ownerId order by a.createdAt desc, a.id desc")
+    List<AdoptionApplication> findForOwner(@Param("ownerId") Long ownerId);
+
+    boolean existsByCatIdAndAdopterAccountIdAndStatus(Long catId, Long ownerId, AdoptionStatus status);
     List<AdoptionApplication> findByCatIdAndStatus(Long catId, AdoptionStatus status);
 }

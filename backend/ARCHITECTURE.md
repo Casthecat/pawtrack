@@ -1,22 +1,52 @@
 # PawTrack 当前实现架构
 
-更新：2026-09-10。项目面向求职作品集，当前范围为 P1 领养、P2 护理及 P2.4a/b 冻结验证，等待审阅后冻结。实现背景与明确边界见 [项目梳理](../docs/PROJECT_REVIEW.md)。
+更新：2026-09-10。项目面向求职作品集，P1/P2 已冻结为 `v1.0-portfolio-core`；P3 独立状态迁移已完成，P4.4 完成 API 默认拒绝、图片上传和 demo 隔离加固；P4 身份/授权里程碑按本文边界冻结。实现背景与明确边界见 [项目梳理](../docs/PROJECT_REVIEW.md)。
 
 ## 运行结构
 
-React + TypeScript + Vite 通过 REST API 调用 Java 21 / Spring Boot 3.3.6。后端是按业务模块组织的单体应用，持久开发环境使用 PostgreSQL 与 Flyway V1–V6，JPA 使用 validate。测试及 demo profile 使用独立 H2 内存库，并允许 create-drop，避免依赖开发数据。
+React + TypeScript + Vite 通过 REST API 调用 Java 21 / Spring Boot 3.3.6。后端是按业务模块组织的单体应用，持久开发环境使用 PostgreSQL 与 Flyway V1–V10，JPA 使用 validate。测试及 demo profile 使用独立 H2 内存库，并允许 create-drop，避免依赖开发数据。
 
-模块：cat、healthdata、alert、adoption、care。各模块按 api（controller、DTO、mapper）、service、domain 和 repo 组织；这是包级组织约定。Controller 不直接访问 Repository，也不向客户端返回实体。领养、护理时间线、预警队列和处理响应在服务事务内组装 DTO；部分旧猫咪/健康接口在 controller 映射已读取的标量或关联 ID。全局关闭 open-in-view。
+模块：cat、healthdata、alert、adoption、care、identity。各模块按 api（controller、DTO、mapper）、service、domain 和 repo 组织；这是包级组织约定。Controller 不直接访问 Repository，也不向客户端返回实体。领养、护理时间线、预警队列和处理响应在服务事务内组装 DTO；部分旧猫咪/健康接口在 controller 映射已读取的标量或关联 ID。全局关闭 open-in-view。
+
+## 身份、session 与申请归属（P4.1–P4.4）
+
+identity 模块新增 UserAccount（规范化 email、displayName、passwordHash、STAFF/ADOPTER、时间戳）及 V9 user_accounts 表。邮箱在内部创建服务和登录查询中使用 trim + Locale.ROOT 小写，数据库唯一约束防止重复，V9 另校验规范化存储和角色值。PasswordEncoder 使用 Spring Security DelegatingPasswordEncoder，当前写入 BCrypt；没有公开注册接口。
+
+使用标准表单认证过滤器、数据库 UserDetailsService 和服务端 HTTP session；不引入 JWT/refresh token，因为当前单 SPA、单体后端不需要另一套 token 生命周期。principal 是独立 AccountPrincipal 快照，不是 JPA 实体；认证后密码凭据被擦除。POST /api/auth/login 接受 form-urlencoded email/password，成功返回安全的用户 DTO；GET /api/auth/me 未登录返回 401；POST /api/auth/logout 使用框架退出流程使 session 失效。
+
+GET /api/auth/csrf 返回 headerName 和经过框架 XOR 编码的 token，并写入 HttpOnly、SameSite=Lax 的 XSRF-TOKEN cookie。SPA 使用响应中的 token 作为 X-XSRF-TOKEN 请求头，保留 cookie；登录和退出后重新获取。所有认证路径的非安全方法，以及任何已认证 session 的非安全请求，都检查 CSRF。匿名申请提交由授权层返回 401；ADOPTER 提交必须带有效 CSRF。SPA 沿用集中 Axios 处理器，对全部非安全方法请求获取并附加 token，没有申请专用 token 逻辑。403 清除内存 token 供下次显式重试，失败请求不会自动重放。
+
+工作人员审核队列、批准/拒绝、预警队列/处理、护理时间线、健康历史/写入、预警查询别名、创建猫及图片上传均要求 ROLE_STAFF；API 未登录返回 JSON 401，ADOPTER 返回 403。公开猫读取/图片仍开放。POST /api/adoptions 要求 ADOPTER，GET /api/adoptions/{id} 要求登录并在服务层验证 STAFF 或 owner ID；其他 ADOPTER 返回与不存在一致的 404。GET /api/me/adoptions 仅返回调用者拥有的申请。完整变更见 [P4.3 报告](../docs/P4_3_ADOPTER_OWNERSHIP.md)，所有当前路由按方法及路径显式分类，实体 ID 匹配数字路径；最后 `/api` 与 `/api/**` denyAll，STAFF 无默认越权通道。非 API SPA/static 仍公开，完整最终清单见 [P4.4 路由](../docs/P4_4_ROUTE_INVENTORY.md)。已删除的 status/close 接口现在先被授权层拒绝，STAFF 收到 403，而非旧的 handler 404。
+
+前端 React Query 管理 current-user，/login 使用语义化表单，session cookie 由浏览器管理。/staff 和 /staff/care 共享 RequireStaff 守卫；匿名转登录，仅从路由 state 接受严格白名单内的工作人员、Cat 详情、My applications 和申请详情路径，ADOPTER 留在明确的拒绝页面。导航显示姓名/角色与退出入口。退出清除查询和 mutation 缓存；任何非登录 API 返回 401 时清除当前用户与工作人员/申请私有查询缓存，进入登录流程，避免把权限失效显示为空队列。没有 localStorage/sessionStorage 认证存储。
+
+session 使用框架 fixation 防护、30 分钟空闲超时、仅 cookie 跟踪，JSESSIONID 为 HttpOnly/SameSite=Lax。localhost HTTP 验证不代表 HTTPS 安全；Secure cookie、TLS、代理信任配置属于后续部署。demo profile 单独创建一个 STAFF 和两个 ADOPTER 带编码密码的虚构账户，非 demo profile 不创建。静态 BeanFactoryPostProcessor 在数据库/JPA 初始化前检查命名 H2 内存 URL、H2 driver、create-drop，拒绝持久库及额外 URL 指令；播种前再核对实际数据库产品及 URL，防止仅依赖配置标签。凭据、准确契约和验证边界见 [P4.1 报告](../docs/P4_1_IDENTITY_SESSION.md)。
+
+## 猫的独立状态（P3.1 / P3.2）
+
+Cat 的唯一业务状态来源是两个字符串持久化的枚举：`CatHealthStatus`（NORMAL、UNDER_OBSERVATION、SICK）和 `CatAdoptionStatus`（AVAILABLE、ADOPTED）。两者独立，新猫默认 NORMAL + AVAILABLE；已领养猫仍可生病或需要观察。申请使用另一个 `AdoptionStatus`（PENDING、APPROVED、REJECTED），描述审核流程，不能与猫的领养状态共用。
+
+V7 新增非空 `health_status`、`adoption_status`，不修改 V1–V6。旧 NORMAL/ADOPTABLE 回填 NORMAL + AVAILABLE，UNDER_OBSERVATION/SICK 保留健康值并回填 AVAILABLE；ADOPTED 回填 NORMAL + ADOPTED。最后一种健康 NORMAL 是历史兼容假设：旧单字段已覆盖独立健康信息，无法重建。未知旧值使迁移失败，必须先明确处理。
+
+P3.1 曾保留数据库旧列和单字段 API 投影，完整过渡记录见 [P3.1 报告](../docs/P3_1_TYPED_CAT_STATUS.md)。P3.2 的 V8 在确认两个 typed 列均有 NOT NULL 约束且无空值后删除 `cats.status`，不再读取旧值或重复回填；V1–V7 保持不变。Hibernate validate 在真实 PostgreSQL V8 schema 上验证通过。
+
+CatResponse/CatDetailResponse 现在直接返回 `healthStatus` 和 `adoptionStatus` 枚举名，旧 `status` 输出和 CatMapper 兼容投影已删除。列表、单猫、创建、图片上传响应使用 CatResponse；dashboard 额外返回 `temperatureC` 和 `hasActiveAlert`。Alert 和领养申请的 `status` 不变。
+
+旧 `PATCH /api/cats/{id}/status`、UpdateCatStatusRequest 和 CatService.updateStatus 已删除。它没有前端调用，当前演示不需要手工状态编辑，因此不添加替代 health-status PATCH。健康观察与预警处理更新健康状态，批准流程更新领养状态，不提供直接设置领养状态的接口。API 与前端应一同更新；旧客户端不再兼容。
 
 ## 领养事务
 
 提交、批准和拒绝都先锁定对应的 Cat 行。审核接口先查询 catId，再取得猫行的悲观写锁，最后读取申请当前状态，避免锁等待前读入旧状态。
 
-提交校验猫状态为 NORMAL 或 ADOPTABLE、没有 OPEN 预警，并检查同猫同邮箱是否存在 PENDING 申请。邮箱去掉首尾空白并统一小写。
+提交根据 AccountPrincipal.accountId 读取账户，要求 ADOPTER，把账户关联以及当前 displayName/规范化 email 保存为申请时快照。请求仅含 catId、可选 notes；旧身份字段即使随请求发送也不会参与身份解析。取得 Cat 锁后校验 AVAILABLE、NORMAL、无 OPEN 预警，并检查同猫同账户是否已有 PENDING 申请；终态不阻止重新申请。
 
-批准只允许 PENDING。单个事务内执行：申请变为 APPROVED，猫变为 ADOPTED，其他 PENDING 申请变为 REJECTED。拒绝只改变当前 PENDING 申请。重复或逆转终态返回 409。不存在的记录返回 404；输入格式/字段错误返回 400。
+批准只允许 PENDING，并重新校验同一领养资格。单个事务内执行：申请变为 APPROVED，猫 adoptionStatus 变为 ADOPTED、healthStatus 保持不变，其他 PENDING 申请变为 REJECTED。拒绝只改变当前 PENDING 申请。重复或逆转终态返回 409。不存在的记录返回 404；输入格式/字段错误返回 400。
 
-应用服务使用相同的猫行锁约定协调领养、健康上报、状态更新与图片写入。这是应用路径上的一致性保证，尚未添加数据库唯一约束来覆盖外部脚本或直接 SQL 写入。
+应用服务使用相同的猫行锁约定协调领养、健康上报、预警处理与图片写入。这是应用路径上的一致性保证，尚未添加数据库唯一约束来覆盖外部脚本或直接 SQL 写入。
+
+V10 仅为 adoption_applications 增加可空 adopter_account_id、到 user_accounts 的 ON DELETE RESTRICT 外键以及 (adopter_account_id, created_at DESC, id DESC) 索引。V1–V9 不变。历史行不按邮箱回填，NULL owner 行仍供 STAFF 审核，ADOPTER 不可认领或读取。新服务提交必须绑定 owner；可空 schema 是历史兼容边界，不能阻止直接 SQL 人工创建无主行。
+
+My applications 按 owner ID 查询，按 createdAt DESC、id DESC 排序，在只读服务事务内抓取 Cat 并组装原有响应 DTO，不暴露 UserAccount 或密码字段。前端 /applications 仅对 ADOPTER 开放；/applications/:id 允许已登录用户进入，数据授权由服务层决定。私有申请 query key 含账户 ID；401 和退出清除私有缓存，避免账户切换后显示旧回执。
 
 ## 健康与领养联动
 
@@ -24,9 +54,9 @@ HealthDataService 保存数据后调用 HealthMonitorService。当前规则检�
 
 HealthData 最新值与历史查询统一按 ts DESC、id DESC；同时间取更大 ID。可空温度的 HTTP 输入使用 @Digits(integer=3, fraction=2) 对齐 NUMERIC(5,2)，多余精度/超容量返回 400，不静默舍入。前端时间线及详情均显示两位小数。新的正常观察不会自动关闭已有 OPEN 预警。
 
-同猫同类型已有 OPEN 预警时不重复创建。关闭后再次发现异常可以新建预警。健康监测不会覆盖 ADOPTED 或 SICK 状态，普通猫状态接口也不能直接设置或撤销 ADOPTED。
+同猫同类型已有 OPEN 预警时不重复创建。关闭后再次发现异常可以新建预警。发烧将非 SICK 的 healthStatus 设为 UNDER_OBSERVATION，保留 SICK；无论猫是否已领养，都不改变 adoptionStatus。
 
-cat.status 仍混合健康与领养含义，是后续模型债务。P2.2 只在工作人员处理最后一个 OPEN 预警时，将恰好为 UNDER_OBSERVATION 的猫恢复为 NORMAL。自动关闭预警、历史窗口规则、通知和机器学习目前未实现。
+工作人员处理最后一个 OPEN 预警时，只将恰好为 UNDER_OBSERVATION 的 healthStatus 恢复为 NORMAL，领养状态保持不变。自动关闭预警、历史窗口规则、通知和机器学习目前未实现。
 
 ## 护理时间线（P2.1）
 
@@ -44,13 +74,17 @@ CareRecord 表示工作人员人工输入的一次护理动作或备注。P2.1 �
 
 `care.service.AlertResolutionService` 编排跨模块操作，alert 模块不反向依赖 care。`PATCH /api/alerts/{alertId}/resolve` 接受护理类型与备注，使用服务层事务，先以标量查询获得 catId，再通过 `CatRepository.findByIdForUpdate` 获取猫行悲观写锁，之后才读取 Alert 可变状态。全局顺序是 Cat → Alert/CareRecord/领养相关状态，与健康上报和领养事务一致。
 
-只有 OPEN 可以处理。事务将预警设置为 CLOSED，记录服务端 `resolvedAt`，创建同时间且关联预警的 CareRecord，刷新后检查该猫剩余 OPEN 预警。只有零个 OPEN 且 Cat.status 恰好为 UNDER_OBSERVATION 时，才恢复 NORMAL。ADOPTED、SICK 及其他显式状态全部保留。这是混合状态模型下的临时兼容规则，不是新的状态框架。
+只有 OPEN 可以处理。事务将预警设置为 CLOSED，记录服务端 `resolvedAt`，创建同时间且关联预警的 CareRecord，刷新后检查该猫剩余 OPEN 预警。只有零个 OPEN 且 healthStatus 恰好为 UNDER_OBSERVATION 时，才恢复健康 NORMAL；SICK 保持不变，adoptionStatus 始终保持不变。已领养且需要观察的猫可以恢复为已领养且健康 NORMAL。
 
 旧 body-less `/close` 接口和 `AlertService.closeAlert` 已删除；本地项目没有生产 API 客户端，仅更新其回归测试。重复 `/resolve` 返回带刷新提示的 409，不重写时间也不创建第二条记录。V6 新增可空 `alerts.resolved_at` 和 `care_records.alert_id`（ON DELETE SET NULL），保留历史已关闭预警的未知处理时间为 NULL。
 
 时间线的原 Alert 事件继续按原始 createdAt 排序，处理动作以 CareRecord.createdAt 出现。只新增可选 `relatedAlertId` 供护理事件追溯来源，DTO 在服务事务内组装。更完整的契约和验证记录见 [P2.2 说明](../docs/P2_2_ALERT_RESOLUTION.md)。
 
 ## 前端状态
+
+前端 Cat 使用 CatHealthStatus 和 CatAdoptionStatus 两个独立类型。卡片和详情同时显示领养标签（Awaiting a home / Found a home）和健康标签（Health: normal / Under observation / Sick · receiving care），不会用一个维度覆盖另一个，也不保存派生状态。领养申请标签仍单独使用 AdoptionStatus。
+
+画廊 Ready to meet 数量和筛选要求 AVAILABLE + NORMAL，Found a home 只要求 ADOPTED。列表契约没有 hasActiveAlert，因此不推测预警信息；画廊的 Ready to meet 不保证最终可申请。详情使用 AVAILABLE + NORMAL + 无活跃预警控制申请入口，后端仍重新校验并返回 409。已领养猫出现预警时继续显示已找到家及健康状态，提示护理评估，不暗示领养被撤销。
 
 React Router 提供猫咪列表、猫咪详情、申请回执和工作人员审核页面。React Query 缓存 API 数据；提交与审核后使相关查询失效，回执和审核队列定期刷新。前端负责输入体验，后端始终重新检查业务资格。
 
@@ -62,10 +96,20 @@ P2.3 用 StaffLayout 共享工作人员导航：`/staff` 保留领养审核，`/
 
 Vite 的 /api 和 /uploads 代理连接本地后端。错误页面区分网络失败与空数据；表单防重复点击，审核先显示具体影响再提交。
 
+## 本地图片上传边界（P4.4）
+
+上传继续要求 STAFF 与 CSRF；CatService 保持原 Cat 悲观锁和事务，委托小型 CatImageStorage 验证并保存图片。仅 JPEG/PNG，最多 5 MiB，multipart 请求最多 6 MiB；解码前限制每边 4096 像素、总计 16 MP。ImageIO 根据真实内容选择解码器并核对 MIME，重新编码像素，剥离原始元数据/附加脚本字节；SVG、HTML、伪装及损坏输入返回 400，超字节限制返回 413。
+
+存储名仅来自 UUID 和实际格式扩展名，忽略原始文件名。配置根路径正规化并解析实际目录，目标限定为其直接子文件，CREATE_NEW 防止覆盖。返回 uploads/UUID.jpg 或 .png，不暴露物理路径；GET /uploads/** 保持公开和框架 nosniff。WebConfig 明确目录 URI 尾斜杠，首次上传前目录不存在也能正确提供图片。
+
+文件系统和数据库仍非同一原子事务；SQL 提交失败可能遗留孤立文件，历史图片不自动重编码，管理员对存储目录的直接写入不受上传验证约束。未引入恶意软件扫描、外部图片服务或存储基础设施。
+
 ## 当前边界
 
-这是本地 demo，没有身份认证、角色授权或申请所有权验证；“工作人员页面”是演示入口。不得直接承载真实申请人数据。相机 URL 存在于历史模型中，但前端未提供私有直播能力。
+这是本地 demo，已有 session 身份认证和工作人员角色授权，并实施账户申请所有权验证；仍未完成部署安全。不得直接承载真实申请人数据。相机 URL 存在于历史模型中，但前端未提供私有直播能力。
 
-默认 H2 套件验证 63 个用例；三个独立 PostgreSQL 迁移测试验证升级链；CatLockPostgresRuntimeIT 以 Flyway 初始化的 UUID schema、Hibernate validate 和真实 Spring 服务事务验证三种 Cat 锁执行顺序，并通过 pg_blocking_pids 确认等待。独立浏览器命令分别覆盖模拟 API 的边界回归与真实 demo 的两条业务流程，命令及结果见 README 和 [冻结报告](../docs/P2_4B_MILESTONE_FREEZE.md)。
+P4.4 完整后端 150 项、浏览器 34 项、迁移 12 项、PostgreSQL Cat-lock 4 项以及真实 session demo 的验收见 [P4 冻结报告](../docs/P4_4_AUTHORIZATION_FREEZE.md)。同账户同猫提交用例沿用 pg_blocking_pids 确认真实锁等待，结果一成一败且只有一个 PENDING；不宣称涵盖所有并发历史。P4.4 无迁移，V1–V10、所有权及健康/审核/处理事务规则不变。
 
-这些证据不代表所有线程交错、生产并发吞吐或分布式写入保证。混合 Cat.status、未分页、人工决策新鲜度、时间线快照、直接 SQL 绕过应用约束、文件上传与权限边界仍是明确债务。认证、真实 IoT、AI/ML、通知、微服务、Kafka、实时预警流与部署不在此里程碑内。
+这些证据不代表所有线程交错、生产并发吞吐或分布式写入保证。列表缺少活跃预警信息、未分页、人工决策新鲜度、时间线快照、直接 SQL 绕过应用约束、文件与数据库原子性仍是明确债务。注册、工作人员动作归属、密码找回、邮箱验证、MFA/OAuth、真实 IoT、AI/ML、通知、微服务、Kafka、实时预警流与部署不在 P4.4 内。
+
+P4 不宣称公开注册、邮箱验证、密码重置、OAuth/MFA、暴力破解/速率限制保护、分布式 session、生产 TLS/代理配置、完整安全审计/渗透测试或生产部署安全。后续工作必须单独评审。

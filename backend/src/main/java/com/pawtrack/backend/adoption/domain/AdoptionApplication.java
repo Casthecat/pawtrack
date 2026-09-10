@@ -1,6 +1,7 @@
 package com.pawtrack.backend.adoption.domain;
 
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.identity.domain.UserAccount;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,6 +21,11 @@ public class AdoptionApplication {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "cat_id", nullable = false)
     private Cat cat;
+
+    // NULL only for historical applications; never infer ownership from snapshot email.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "adopter_account_id")
+    private UserAccount adopterAccount;
 
     @Column(name = "adopter_name", nullable = false, length = 120)
     private String adopterName;

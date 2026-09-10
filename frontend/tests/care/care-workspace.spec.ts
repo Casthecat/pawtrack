@@ -45,6 +45,8 @@ async function mockCareApi(page: Page) {
   await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (path === '/api/auth/me') return route.fulfill({ json: { id: 1, email: 'staff@example.com', displayName: 'Demo Staff', role: 'STAFF' } })
+    if (path === '/api/auth/csrf') return route.fulfill({ json: { headerName: 'X-XSRF-TOKEN', token: 'care-csrf' } })
     if (path === '/api/alerts' && request.method() === 'GET') {
       state.queueRequests++
       return route.fulfill({ json: state.queue })
@@ -59,6 +61,7 @@ async function mockCareApi(page: Page) {
       return route.fulfill({ json: response })
     }
     if (path === '/api/alerts/901/resolve' && request.method() === 'PATCH') {
+      expect(request.headers()['x-xsrf-token']).toBe('care-csrf')
       state.patchRequests++
       if (state.patchGate) await state.patchGate.promise
       if (state.patchOutcome === 'network') return route.abort('failed')
@@ -209,7 +212,7 @@ test('temperature precision agrees in timeline and public profile', async ({ pag
   history.events = measurements.map((temperatureC, index) => ({ ...observation, sourceId: 810 + index, temperatureC }))
   await page.route('**/api/cats/4/health-timeline', route => route.fulfill({ json: history }))
   await page.route('**/api/cats/4/dashboard', route => route.fulfill({ json: {
-    id: 4, name: 'Nori', status: 'UNDER_OBSERVATION', imageUrl: null, streamUrl: null,
+    id: 4, name: 'Nori', healthStatus: 'UNDER_OBSERVATION', adoptionStatus: 'AVAILABLE', imageUrl: null, streamUrl: null,
     createdAt: nori.createdAt, updatedAt: nori.createdAt, temperatureC: 39.51, hasActiveAlert: true,
   } }))
   await page.goto('/staff/care')

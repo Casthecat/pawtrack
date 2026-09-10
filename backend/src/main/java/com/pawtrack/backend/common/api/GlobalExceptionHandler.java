@@ -15,6 +15,11 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<?> oversizedUpload() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(Map.of("message", "Portraits must be 5 MiB or smaller; the multipart request must fit within 6 MiB."));
+    }
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<?> notFound(EntityNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));

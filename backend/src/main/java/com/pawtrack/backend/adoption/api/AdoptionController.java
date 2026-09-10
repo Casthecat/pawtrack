@@ -12,18 +12,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.pawtrack.backend.identity.security.AccountPrincipal;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/adoptions")
 @RequiredArgsConstructor
-@Tag(name = "Adoptions", description = "Local demo APIs; authentication is planned")
+@Tag(name = "Adoptions", description = "Account-owned adopter applications and staff review")
 public class AdoptionController {
     private final AdoptionService adoptionService;
 
     @PostMapping
     @Operation(summary = "Submit adoption application")
-    public ResponseEntity<AdoptionApplicationResponse> submit(@Valid @RequestBody AdoptionApplicationRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(adoptionService.submitApplication(req));
+    public ResponseEntity<AdoptionApplicationResponse> submit(@Valid @RequestBody AdoptionApplicationRequest req,
+            @AuthenticationPrincipal AccountPrincipal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adoptionService.submitApplication(req, principal));
     }
 
     @GetMapping
@@ -33,8 +36,8 @@ public class AdoptionController {
     }
 
     @GetMapping("/{id}")
-    public AdoptionApplicationResponse getById(@PathVariable Long id) {
-        return adoptionService.getById(id);
+    public AdoptionApplicationResponse getById(@PathVariable Long id, @AuthenticationPrincipal AccountPrincipal principal) {
+        return adoptionService.getById(id, principal);
     }
 
     @PatchMapping("/{id}/approve")

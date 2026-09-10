@@ -1,5 +1,7 @@
 package com.pawtrack.backend.consistency;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.pawtrack.backend.BackendApplication;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.domain.AdoptionStatus;
@@ -12,6 +14,8 @@ import com.pawtrack.backend.care.domain.CareRecordType;
 import com.pawtrack.backend.care.repo.CareRecordRepository;
 import com.pawtrack.backend.care.service.AlertResolutionService;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
 import com.pawtrack.backend.healthdata.service.HealthDataService;
@@ -69,6 +73,7 @@ class CatLockPostgresRuntimeIT {
         properties.add("logging.level.org.hibernate.SQL", () -> "INFO");
     }
 
+    @Autowired UserAccountRepository accounts;
     @Autowired CatRepository cats;
     @Autowired AdoptionApplicationRepository applications;
     @Autowired AlertRepository alerts;
@@ -109,7 +114,8 @@ class CatLockPostgresRuntimeIT {
         assertEquals(AdoptionStatus.APPROVED, applications.findById(first).orElseThrow().getStatus());
         assertEquals(AdoptionStatus.REJECTED, applications.findById(second).orElseThrow().getStatus());
         assertEquals(1, applications.findAll().stream().filter(app -> app.getStatus() == AdoptionStatus.APPROVED).count());
-        assertEquals("ADOPTED", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(catId).orElseThrow().getAdoptionStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(catId).orElseThrow().getHealthStatus());
     }
 
     @Test
@@ -125,7 +131,8 @@ class CatLockPostgresRuntimeIT {
         assertEquals(alertId, care.getAlert().getId());
         assertEquals(catId, care.getCat().getId());
         assertEquals(closed.getResolvedAt(), care.getCreatedAt());
-        assertEquals("NORMAL", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(catId).orElseThrow().getHealthStatus());
+        assertEquals(CatAdoptionStatus.AVAILABLE, cats.findById(catId).orElseThrow().getAdoptionStatus());
     }
 
     @Test
@@ -142,15 +149,28 @@ class CatLockPostgresRuntimeIT {
         assertNotEquals(oldAlertId, open.getFirst().getId());
         assertEquals(1, careRecords.count());
         assertEquals(oldAlertId, careRecords.findAll().getFirst().getAlert().getId());
-        assertEquals("UNDER_OBSERVATION", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, cats.findById(catId).orElseThrow().getHealthStatus());
+        assertEquals(CatAdoptionStatus.AVAILABLE, cats.findById(catId).orElseThrow().getAdoptionStatus());
+    }
+
+    @Test
+    void sameOwnerSubmissionsWaitForCatAndKeepExactlyOnePendingApplication() throws Exception {
+        var principal = TestAccounts.adopter(accounts, "same-owner@example.com");
+        var request = new AdoptionApplicationRequest();
+        request.setCatId(catId);
+        assertEquals(List.of(200, 409), runWithCatLock(
+                () -> adoption.submitApplication(request, principal),
+                () -> adoption.submitApplication(request, principal)));
+        var pending = applications.findByCatIdAndStatus(catId, AdoptionStatus.PENDING);
+        assertEquals(1, pending.size());
+        assertEquals(principal.getAccountId(), pending.getFirst().getAdopterAccount().getId());
+        assertEquals(1, applications.count());
     }
 
     private Long submit(String email) {
         var request = new AdoptionApplicationRequest();
         request.setCatId(catId);
-        request.setAdopterName("Demo applicant");
-        request.setAdopterEmail(email);
-        return adoption.submitApplication(request).id();
+        return adoption.submitApplication(request, TestAccounts.adopter(accounts, email)).id();
     }
 
     private Long fever() {

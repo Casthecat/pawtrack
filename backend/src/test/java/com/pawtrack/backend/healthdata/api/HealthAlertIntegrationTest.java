@@ -5,6 +5,7 @@ import com.pawtrack.backend.alert.domain.Alert;
 import com.pawtrack.backend.alert.domain.AlertType;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(
         classes = HealthAlertIntegrationTest.TestApplication.class,
         properties = {
@@ -83,7 +85,7 @@ class HealthAlertIntegrationTest {
         assertTrue(alerts.stream().anyMatch(a -> a.getType() == AlertType.FEVER));
 
         Cat updated = catRepository.findById(savedCat.getId()).orElseThrow();
-        assertEquals("UNDER_OBSERVATION", updated.getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, updated.getHealthStatus());
     }
 
     @SpringBootConfiguration
@@ -95,7 +97,10 @@ class HealthAlertIntegrationTest {
             "com.pawtrack.backend.alert.service",
             "com.pawtrack.backend.cat.service"
     })
-    @Import(HealthDataController.class)
+    @Import({HealthDataController.class,
+            com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class,
+            com.pawtrack.backend.identity.security.AccountDetailsService.class,
+            com.pawtrack.backend.identity.security.PasswordConfiguration.class})
     static class TestApplication {
     }
 }

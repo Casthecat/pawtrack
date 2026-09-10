@@ -1,0 +1,14 @@
+# P3.2 status usage inventory and decisions
+
+Recorded before implementation, starting from a clean `feat/p3-status-model` worktree. P3.1 remains documented separately.
+
+- Backend CatResponse/CatDetailResponse contain the outgoing String status. CatMapper collapses the typed fields for both responses. CatController exposes the old PATCH, UpdateCatStatusRequest validates its strings, and CatService translates them with an adopted-cat guard. No frontend caller uses that PATCH; remove all three unused pieces without adding a health-edit endpoint.
+- Backend business rules already use typed fields exclusively. Cat, adoption approval, health monitoring, alert resolution and locking need no new business transitions. DemoData uses defaults and monitoring; retain all six cats.
+- Frontend `api/types.ts` defines CatStatus and Cat.status. `GalleryPage` uses it for ready count and ready/adopted filters. `CatCard` uses it for badge and description. `CatDetailPage` uses it for badge, eligibility and adopted/care notices. `StatusBadge` shares labels with application statuses. Split Cat presentation into two independent badges; retain application status semantics.
+- The gallery list uses CatResponse, which has no active-alert flag. Ready filtering therefore uses AVAILABLE + NORMAL only. The dashboard has hasActiveAlert; detail eligibility uses both typed fields plus no active alert. Do not infer a gallery alert state or add an API field.
+- `frontend/tests/care/care-workspace.spec.ts` has one legacy dashboard fixture; selection/readiness tests otherwise concern Alert state. `tests/live/milestone.spec.ts` checks legacy dashboard status; migrate this assertion and extend the real demo to show adopted + fever after the existing two slices.
+- Backend direct compatibility assertions occur in CatControllerWebMvcTest, TypedCatStatusIntegrationTest and CatStatusPostgresMigrationIT. AdoptionReviewIntegrationTest exercises the old PATCH guard. Keep domain/concurrency assertions; replace removed-endpoint tests with unavailability checks and update output assertions. The historical V7 migration test retains its V7 target/data checks, adapting only current Java DTO usage and pinning its application startup to V7.
+- HistoricalMigrationIntegrityTest currently protects V1–V6; extend the frozen-content guard through V7. Add a separate V8 PostgreSQL verification, keeping older migration targets intact. V8 verifies typed columns are non-null before dropping the legacy column, and never re-backfills.
+- Other frontend/backend `status` occurrences represent AlertStatus, adoption-application lifecycle, HTTP status, CSS classes or accessibility roles; preserve them. P3.1 documents and V1–V7 intentionally retain historical terminology.
+
+No new health-edit UI, gallery filter category, demo seed, persisted eligibility state or product feature is required.

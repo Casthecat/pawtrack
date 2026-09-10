@@ -9,7 +9,11 @@ import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
 import com.pawtrack.backend.alert.domain.AlertStatus;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
+import com.pawtrack.backend.identity.security.AccountPrincipal;
+import com.pawtrack.backend.identity.domain.UserRole;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -27,27 +30,44 @@ public class AdoptionService {
     private final AdoptionApplicationRepository applications;
     private final CatRepository cats;
     private final AlertRepository alerts;
+    private final UserAccountRepository accounts;
 
     public List<AdoptionApplicationResponse> list(AdoptionStatus status) {
         return applications.findForReview(status).stream().map(AdoptionApplicationMapper::toResponse).toList();
     }
 
-    public AdoptionApplicationResponse getById(Long id) {
-        return response(findApplication(id));
+    public AdoptionApplicationResponse getById(Long id, AccountPrincipal principal) {
+        requireAuthenticated(principal);
+        var app = findApplication(id);
+        if (principal.getRole() != UserRole.STAFF && (app.getAdopterAccount() == null
+                || !app.getAdopterAccount().getId().equals(principal.getAccountId()))) {
+            throw new EntityNotFoundException("Adoption application not found: " + id);
+        }
+        return response(app);
+    }
+
+    public List<AdoptionApplicationResponse> mine(AccountPrincipal principal) {
+        requireAdopter(principal);
+        return applications.findForOwner(principal.getAccountId()).stream()
+                .map(AdoptionApplicationMapper::toResponse).toList();
     }
 
     @Transactional
-    public AdoptionApplicationResponse submitApplication(AdoptionApplicationRequest req) {
+    public AdoptionApplicationResponse submitApplication(AdoptionApplicationRequest req, AccountPrincipal principal) {
+        requireAdopter(principal);
+        var account = accounts.findById(principal.getAccountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required."));
+        if (account.getRole() != UserRole.ADOPTER) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Adopter access required.");
         Cat cat = lockCat(req.getCatId());
         requireAvailable(cat);
-        String email = req.getAdopterEmail().trim().toLowerCase(Locale.ROOT);
-        if (applications.existsByCatIdAndAdopterEmailIgnoreCaseAndStatus(cat.getId(), email, AdoptionStatus.PENDING)) {
+        if (applications.existsByCatIdAndAdopterAccountIdAndStatus(cat.getId(), account.getId(), AdoptionStatus.PENDING)) {
             throw conflict("You already have a pending application for this cat.");
         }
         AdoptionApplication app = new AdoptionApplication();
         app.setCat(cat);
-        app.setAdopterName(req.getAdopterName().trim());
-        app.setAdopterEmail(email);
+        app.setAdopterAccount(account);
+        app.setAdopterName(account.getDisplayName());
+        app.setAdopterEmail(account.getEmail());
         app.setNotes(req.getNotes() == null ? null : req.getNotes().trim());
         return response(applications.saveAndFlush(app));
     }
@@ -58,7 +78,7 @@ public class AdoptionService {
         requirePending(app);
         requireAvailable(app.getCat());
         app.setStatus(AdoptionStatus.APPROVED);
-        app.getCat().setStatus("ADOPTED");
+        app.getCat().setAdoptionStatus(CatAdoptionStatus.ADOPTED);
         // Serialize decisions on a cat, including decisions on different applications.
         for (AdoptionApplication other : applications.findByCatIdAndStatus(app.getCat().getId(), AdoptionStatus.PENDING)) {
             if (!other.getId().equals(id)) other.setStatus(AdoptionStatus.REJECTED);
@@ -111,5 +131,14 @@ public class AdoptionService {
 
     private AdoptionApplicationResponse response(AdoptionApplication app) {
         return AdoptionApplicationMapper.toResponse(app);
+    }
+
+    private void requireAuthenticated(AccountPrincipal principal) {
+        if (principal == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required.");
+    }
+
+    private void requireAdopter(AccountPrincipal principal) {
+        requireAuthenticated(principal);
+        if (principal.getRole() != UserRole.ADOPTER) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Adopter access required.");
     }
 }

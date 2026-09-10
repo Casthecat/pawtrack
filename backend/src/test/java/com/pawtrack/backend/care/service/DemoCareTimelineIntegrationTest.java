@@ -1,9 +1,12 @@
 package com.pawtrack.backend.care.service;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.service.AdoptionService;
 import com.pawtrack.backend.care.api.dto.HealthTimelineEventKind;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoCareTimelineIntegrationTest {
 
+    @Autowired UserAccountRepository accounts;
     @Autowired CatRepository cats;
     @Autowired HealthTimelineService timelines;
     @Autowired AdoptionService adoptions;
@@ -38,14 +42,12 @@ class DemoCareTimelineIntegrationTest {
         assertEquals(1, timeline.events().stream()
                 .filter(event -> event.eventKind() == HealthTimelineEventKind.CARE_RECORD)
                 .count());
-        assertEquals("UNDER_OBSERVATION", nori.getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, nori.getHealthStatus());
 
         Cat mochi = findCat("Mochi");
         AdoptionApplicationRequest request = new AdoptionApplicationRequest();
         request.setCatId(mochi.getId());
-        request.setAdopterName("Demo Applicant");
-        request.setAdopterEmail("demo@example.com");
-        assertEquals("PENDING", adoptions.submitApplication(request).status());
+        assertEquals("PENDING", adoptions.submitApplication(request, TestAccounts.adopter(accounts, "adopter@example.com")).status());
     }
 
     private Cat findCat(String name) {

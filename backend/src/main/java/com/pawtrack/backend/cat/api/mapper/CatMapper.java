@@ -15,7 +15,8 @@ public class CatMapper {
         return new CatResponse(
                 c.getId(),
                 c.getName(),
-                c.getStatus(),
+                c.getHealthStatus(),
+                c.getAdoptionStatus(),
                 c.getStreamUrl(),
                 c.getImageUrl(),
                 c.getCreatedAt(),
@@ -28,7 +29,8 @@ public class CatMapper {
         return new CatDetailResponse(
                 c.getId(),
                 c.getName(),
-                c.getStatus(),
+                c.getHealthStatus(),
+                c.getAdoptionStatus(),
                 c.getStreamUrl(),
                 c.getImageUrl(),
                 c.getCreatedAt(),

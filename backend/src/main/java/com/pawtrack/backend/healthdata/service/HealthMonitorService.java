@@ -6,6 +6,7 @@ import com.pawtrack.backend.alert.domain.AlertStatus;
 import com.pawtrack.backend.alert.domain.AlertType;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.domain.HealthData;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
@@ -50,8 +51,8 @@ public class HealthMonitorService {
                 alert.setMessage("Automatic alert: High temperature detected (" + temperatureC + "°C)");
                 alertRepository.save(alert);
             }
-            if (!"ADOPTED".equals(cat.getStatus()) && !"SICK".equals(cat.getStatus())) {
-                cat.setStatus("UNDER_OBSERVATION");
+            if (cat.getHealthStatus() != CatHealthStatus.SICK) {
+                cat.setHealthStatus(CatHealthStatus.UNDER_OBSERVATION);
                 catRepository.save(cat);
             }
             return true;
