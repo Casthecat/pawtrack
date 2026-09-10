@@ -1,11 +1,14 @@
 package com.pawtrack.backend.cat.api.dto;
 
 import java.time.OffsetDateTime;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
 
 public class CatResponse {
     private Long id;
     private String name;
-    private String status;
+    private CatHealthStatus healthStatus;
+    private CatAdoptionStatus adoptionStatus;
     private String streamUrl;
     private String imageUrl;
     private OffsetDateTime createdAt;
@@ -14,7 +17,8 @@ public class CatResponse {
     public CatResponse(
             Long id,
             String name,
-            String status,
+            CatHealthStatus healthStatus,
+            CatAdoptionStatus adoptionStatus,
             String streamUrl,
             String imageUrl,
             OffsetDateTime createdAt,
@@ -22,7 +26,8 @@ public class CatResponse {
     ) {
         this.id = id;
         this.name = name;
-        this.status = status;
+        this.healthStatus = healthStatus;
+        this.adoptionStatus = adoptionStatus;
         this.streamUrl = streamUrl;
         this.imageUrl = imageUrl;
         this.createdAt = createdAt;
@@ -31,7 +36,8 @@ public class CatResponse {
 
     public Long getId() { return id; }
     public String getName() { return name; }
-    public String getStatus() { return status; }
+    public CatHealthStatus getHealthStatus() { return healthStatus; }
+    public CatAdoptionStatus getAdoptionStatus() { return adoptionStatus; }
     public String getStreamUrl() { return streamUrl; }
     public String getImageUrl() { return imageUrl; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

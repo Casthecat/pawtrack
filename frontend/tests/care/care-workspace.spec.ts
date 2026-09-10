@@ -209,7 +209,7 @@ test('temperature precision agrees in timeline and public profile', async ({ pag
   history.events = measurements.map((temperatureC, index) => ({ ...observation, sourceId: 810 + index, temperatureC }))
   await page.route('**/api/cats/4/health-timeline', route => route.fulfill({ json: history }))
   await page.route('**/api/cats/4/dashboard', route => route.fulfill({ json: {
-    id: 4, name: 'Nori', status: 'UNDER_OBSERVATION', imageUrl: null, streamUrl: null,
+    id: 4, name: 'Nori', healthStatus: 'UNDER_OBSERVATION', adoptionStatus: 'AVAILABLE', imageUrl: null, streamUrl: null,
     createdAt: nori.createdAt, updatedAt: nori.createdAt, temperatureC: 39.51, hasActiveAlert: true,
   } }))
   await page.goto('/staff/care')

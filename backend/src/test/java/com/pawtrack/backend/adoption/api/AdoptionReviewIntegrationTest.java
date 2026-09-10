@@ -131,7 +131,7 @@ class AdoptionReviewIntegrationTest {
         mvc.perform(patch("/api/adoptions/{id}/approve", approved.id())).andExpect(status().isConflict());
         mvc.perform(patch("/api/adoptions/{id}/reject", approved.id())).andExpect(status().isConflict());
         mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"NORMAL\"}"))
-                .andExpect(status().isConflict());
+                .andExpect(status().isNotFound());
         assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
         assertEquals("APPROVED", service.getById(approved.id()).status());
     }

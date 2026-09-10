@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -72,6 +73,9 @@ class CatImageUploadIntegrationTest {
                                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 )
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.healthStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.adoptionStatus").value("AVAILABLE"))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString();

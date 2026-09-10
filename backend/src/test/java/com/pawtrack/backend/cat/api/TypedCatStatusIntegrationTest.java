@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -67,7 +66,9 @@ class TypedCatStatusIntegrationTest {
         }
         var body = mvc.perform(post("/api/cats").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"New arrival\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("NORMAL"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.healthStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.adoptionStatus").value("AVAILABLE"))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
         Cat stored = cats.findById(json.readTree(body).get("id").asLong()).orElseThrow();
         assertEquals(CatHealthStatus.NORMAL, stored.getHealthStatus());
@@ -75,22 +76,24 @@ class TypedCatStatusIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"AVAILABLE,NORMAL,NORMAL,201", "AVAILABLE,UNDER_OBSERVATION,UNDER_OBSERVATION,409",
-            "AVAILABLE,SICK,SICK,409", "ADOPTED,NORMAL,ADOPTED,409",
-            "ADOPTED,UNDER_OBSERVATION,ADOPTED,409", "ADOPTED,SICK,ADOPTED,409"})
-    void persistedCombinationsPreserveDtoCompatibilityAndEligibility(CatAdoptionStatus adoption,
-            CatHealthStatus healthStatus, String legacy, int applicationStatus) throws Exception {
+    @CsvSource({"AVAILABLE,NORMAL,201", "AVAILABLE,UNDER_OBSERVATION,409",
+            "AVAILABLE,SICK,409", "ADOPTED,NORMAL,409",
+            "ADOPTED,UNDER_OBSERVATION,409", "ADOPTED,SICK,409"})
+    void persistedCombinationsExposeBothDimensionsAndEligibility(CatAdoptionStatus adoption,
+            CatHealthStatus healthStatus, int applicationStatus) throws Exception {
         cat.setAdoptionStatus(adoption);
         cat.setHealthStatus(healthStatus);
         cats.saveAndFlush(cat);
         for (String suffix : new String[]{"", "/dashboard"}) {
             mvc.perform(get("/api/cats/" + cat.getId() + suffix)).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value(legacy))
-                    .andExpect(jsonPath("$.healthStatus").doesNotExist())
-                    .andExpect(jsonPath("$.adoptionStatus").doesNotExist());
+                    .andExpect(jsonPath("$.status").doesNotExist())
+                    .andExpect(jsonPath("$.healthStatus").value(healthStatus.name()))
+                    .andExpect(jsonPath("$.adoptionStatus").value(adoption.name()));
         }
         mvc.perform(get("/api/cats")).andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value(legacy));
+                .andExpect(jsonPath("$[0].status").doesNotExist())
+                .andExpect(jsonPath("$[0].healthStatus").value(healthStatus.name()))
+                .andExpect(jsonPath("$[0].adoptionStatus").value(adoption.name()));
         apply("first@example.com", applicationStatus);
         var stored = reload();
         assertEquals(healthStatus, stored.getHealthStatus());
@@ -139,45 +142,26 @@ class TypedCatStatusIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"NORMAL,NORMAL", "ADOPTABLE,NORMAL", "UNDER_OBSERVATION,UNDER_OBSERVATION", "SICK,SICK"})
-    void supportedLegacyPatchChangesHealthOnly(String request, CatHealthStatus expected) throws Exception {
-        cat.setHealthStatus(CatHealthStatus.SICK);
+    @CsvSource({"AVAILABLE,NORMAL", "AVAILABLE,UNDER_OBSERVATION", "AVAILABLE,SICK",
+            "ADOPTED,NORMAL", "ADOPTED,UNDER_OBSERVATION", "ADOPTED,SICK"})
+    void legacyStatusPatchIsUnavailableAndCannotWriteEitherDimension(CatAdoptionStatus adoption,
+            CatHealthStatus healthStatus) throws Exception {
+        cat.setAdoptionStatus(adoption);
+        cat.setHealthStatus(healthStatus);
         cats.saveAndFlush(cat);
         mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"" + request + "\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(expected.name()));
-        assertEquals(expected, reload().getHealthStatus());
-        assertEquals(CatAdoptionStatus.AVAILABLE, reload().getAdoptionStatus());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"NORMAL", "ADOPTABLE", "UNDER_OBSERVATION", "SICK"})
-    void legacyPatchStillCannotChangeAlreadyAdoptedCat(String request) throws Exception {
-        cat.setAdoptionStatus(CatAdoptionStatus.ADOPTED);
-        cat.setHealthStatus(CatHealthStatus.SICK);
-        cats.saveAndFlush(cat);
-        mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"" + request + "\"}"))
-                .andExpect(status().isConflict());
-        assertEquals(CatAdoptionStatus.ADOPTED, reload().getAdoptionStatus());
-        assertEquals(CatHealthStatus.SICK, reload().getHealthStatus());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"{\"status\":\"ADOPTED\"}", "{\"status\":\"MANUAL_HOLD\"}",
-            "{\"status\":\"normal\"}", "{\"status\":null}"})
-    void invalidLegacyPatchCannotWriteEitherDimension(String body) throws Exception {
-        mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest());
-        assertEquals(CatAdoptionStatus.AVAILABLE, reload().getAdoptionStatus());
-        assertEquals(CatHealthStatus.NORMAL, reload().getHealthStatus());
+                        .content("{\"status\":\"ADOPTED\"}"))
+                .andExpect(status().isNotFound());
+        assertEquals(adoption, reload().getAdoptionStatus());
+        assertEquals(healthStatus, reload().getHealthStatus());
     }
 
     @Test
-    void manualNormalStillCannotBypassAnOpenAlert() throws Exception {
+    void normalHealthStillCannotBypassAnOpenAlert() throws Exception {
         health.create(cat.getId(), null, new BigDecimal("40.00"), 1);
-        mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"NORMAL\"}")).andExpect(status().isOk());
+        cat = reload();
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
+        cats.saveAndFlush(cat);
         assertEquals(CatHealthStatus.NORMAL, reload().getHealthStatus());
         assertEquals(CatAdoptionStatus.AVAILABLE, reload().getAdoptionStatus());
         apply("blocked@example.com", 409);

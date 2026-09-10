@@ -1,7 +1,8 @@
-export type CatStatus = 'NORMAL' | 'UNDER_OBSERVATION' | 'SICK' | 'ADOPTABLE' | 'ADOPTED'
+export type CatHealthStatus = 'NORMAL' | 'UNDER_OBSERVATION' | 'SICK'
+export type CatAdoptionStatus = 'AVAILABLE' | 'ADOPTED'
 export type AdoptionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type Cat = {
-  id: number; name: string; status: CatStatus; imageUrl: string | null
+  id: number; name: string; healthStatus: CatHealthStatus; adoptionStatus: CatAdoptionStatus; imageUrl: string | null
   streamUrl: string | null; createdAt: string; updatedAt: string
 }
 export type CatDetail = Cat & { temperatureC: number | null; hasActiveAlert: boolean }

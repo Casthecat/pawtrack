@@ -85,7 +85,7 @@ class CatStatusPostgresMigrationIT {
                             "--spring.datasource.driver-class-name=org.postgresql.Driver",
                             "--spring.datasource.hikari.schema=" + schema,
                             "--spring.flyway.schemas=" + schema, "--spring.flyway.default-schema=" + schema,
-                            "--spring.flyway.enabled=true", "--spring.jpa.hibernate.ddl-auto=validate",
+                            "--spring.flyway.enabled=true", "--spring.flyway.target=7", "--spring.jpa.hibernate.ddl-auto=validate",
                             "--spring.jpa.properties.hibernate.default_schema=" + schema,
                             "--spring.jpa.open-in-view=false", "--logging.level.org.hibernate.SQL=INFO")) {
                 var cats = context.getBean(CatRepository.class);
@@ -93,9 +93,10 @@ class CatStatusPostgresMigrationIT {
                     var cat = cats.findById((long) i + 1).orElseThrow();
                     assertEquals(health.get(i), cat.getHealthStatus());
                     assertEquals(i == 4 ? CatAdoptionStatus.ADOPTED : CatAdoptionStatus.AVAILABLE, cat.getAdoptionStatus());
-                    String expected = i == 4 ? "ADOPTED" : health.get(i).name();
-                    assertEquals(expected, CatMapper.toResponse(cat).getStatus());
-                    assertEquals(expected, CatMapper.toDetailResponse(cat, null, false).getStatus());
+                    assertEquals(health.get(i), CatMapper.toResponse(cat).getHealthStatus());
+                    assertEquals(cat.getAdoptionStatus(), CatMapper.toResponse(cat).getAdoptionStatus());
+                    assertEquals(health.get(i), CatMapper.toDetailResponse(cat, null, false).getHealthStatus());
+                    assertEquals(cat.getAdoptionStatus(), CatMapper.toDetailResponse(cat, null, false).getAdoptionStatus());
                 }
                 var adoption = context.getBean(AdoptionService.class);
                 var request = new AdoptionApplicationRequest();
@@ -106,7 +107,7 @@ class CatStatusPostgresMigrationIT {
                 var adopted = cats.findById(1L).orElseThrow();
                 assertEquals(CatAdoptionStatus.ADOPTED, adopted.getAdoptionStatus());
                 assertEquals(CatHealthStatus.NORMAL, adopted.getHealthStatus());
-                assertEquals("ADOPTED", CatMapper.toResponse(adopted).getStatus());
+                assertEquals(CatAdoptionStatus.ADOPTED, CatMapper.toResponse(adopted).getAdoptionStatus());
             }
             try (var connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
                 connection.setSchema(schema);

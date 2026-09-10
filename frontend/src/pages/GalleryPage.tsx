@@ -10,9 +10,9 @@ export function GalleryPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const cats = query.data || []
-  const ready = cats.filter(c => ['NORMAL', 'ADOPTABLE'].includes(c.status))
+  const ready = cats.filter(c => c.adoptionStatus === 'AVAILABLE' && c.healthStatus === 'NORMAL')
   const shown = cats.filter(c => c.name.toLowerCase().includes(search.toLowerCase().trim()))
-    .filter(c => filter === 'all' || (filter === 'ready' ? ['NORMAL', 'ADOPTABLE'].includes(c.status) : c.status === 'ADOPTED'))
+    .filter(c => filter === 'all' || (filter === 'ready' ? c.adoptionStatus === 'AVAILABLE' && c.healthStatus === 'NORMAL' : c.adoptionStatus === 'ADOPTED'))
   return <>
     <section className="hero">
       <div className="hero-copy"><p className="eyebrow"><span className="tiny-dot" /> SMALL PAWS. BIG POSSIBILITIES.</p>

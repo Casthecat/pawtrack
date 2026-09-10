@@ -38,7 +38,9 @@ class CatControllerWebMvcTest {
         mockMvc.perform(get("/api/cats/{id}", 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Mochi"))
-                .andExpect(jsonPath("$.status").value("NORMAL"));
+                .andExpect(jsonPath("$.healthStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.adoptionStatus").value("AVAILABLE"))
+                .andExpect(jsonPath("$.status").doesNotExist());
     }
 
     @Test
