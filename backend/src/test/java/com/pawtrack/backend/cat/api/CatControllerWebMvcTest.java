@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @org.springframework.context.annotation.Import(com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class)
+@com.pawtrack.backend.support.StaffRegression
 @WebMvcTest(controllers = CatController.class)
 class CatControllerWebMvcTest {
     @MockBean org.springframework.security.core.userdetails.UserDetailsService identityUsers;

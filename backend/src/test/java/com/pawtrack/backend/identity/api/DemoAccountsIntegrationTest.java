@@ -16,8 +16,8 @@ class DemoAccountsIntegrationTest {
     @Autowired UserAccountRepository accounts;
     @Autowired PasswordEncoder passwords;
 
-    @Test void demoContainsExactlyTwoEncodedAccounts() {
-        assertEquals(2, accounts.count());
+    @Test void demoContainsStaffAndTwoDistinctEncodedAdopterAccounts() {
+        assertEquals(3, accounts.count());
         var staff = accounts.findByEmail("staff@example.com").orElseThrow();
         var adopter = accounts.findByEmail("adopter@example.com").orElseThrow();
         assertEquals(UserRole.STAFF, staff.getRole());
@@ -26,5 +26,9 @@ class DemoAccountsIntegrationTest {
         assertTrue(passwords.matches("PawTrack-demo-adopter!", adopter.getPasswordHash()));
         assertTrue(staff.getPasswordHash().startsWith("{bcrypt}"));
         assertTrue(adopter.getPasswordHash().startsWith("{bcrypt}"));
+        var other = accounts.findByEmail("other-adopter@example.com").orElseThrow();
+        assertEquals(UserRole.ADOPTER, other.getRole());
+        assertTrue(passwords.matches("PawTrack-demo-other!", other.getPasswordHash()));
+        org.junit.jupiter.api.Assertions.assertNotEquals(adopter.getId(), other.getId());
     }
 }

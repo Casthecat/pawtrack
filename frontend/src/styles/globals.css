@@ -293,3 +293,24 @@ footer { max-width: 1160px; width: calc(100% - 80px); margin: auto; border-top: 
 }
 
 .cat-statuses { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.login-panel { max-width: 440px; margin: 35px auto; padding: 30px; background: #efeddf; border-radius: 18px; }
+.login-panel h1 { font-family: Georgia, serif; font-size: 38px; font-weight: 400; margin: 12px 0; }
+.login-panel > p { line-height: 1.7; font-size: 13px; }
+.login-panel form { display: grid; gap: 18px; margin: 24px 0; }
+.login-panel > a { display: inline-flex; margin-top: 20px; }
+.account-label { font-size: 11px; font-weight: 400; align-self: center; }
+.site-header nav { flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; }
+@media (max-width: 650px) {
+  .site-header { align-items: flex-start; gap: 15px; }
+  .site-header nav { gap: 4px 12px; max-width: 220px; }
+  .account-label { width: 100%; text-align: right; font-size: 10px; }
+  .login-panel { margin: 15px auto; padding: 24px; }
+}
+
+.my-applications { list-style: none; padding: 0; display: grid; gap: 20px; }
+.my-applications-page { max-width: 800px; margin: 24px auto; }
+.my-applications h2 { font: 400 24px Georgia, serif; overflow-wrap: anywhere; }
+.my-applications .application-item > p { font-size: 12px; color: #687062; margin: 14px 0 20px; }
+.applicant-identity { margin: 20px 0; overflow-wrap: anywhere; }
+.applicant-identity p { margin-top: 4px; }

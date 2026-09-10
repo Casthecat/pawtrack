@@ -28,11 +28,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@com.pawtrack.backend.support.StaffRegression
 @WebMvcTest(controllers = CatController.class)
 @Import({CatService.class, com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class})
 @TestPropertySource(properties = "spring.autoconfigure.exclude=org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration")
 @ContextConfiguration(classes = CatDashboardIntegrationTest.WebMvcTestConfig.class)
 class CatDashboardIntegrationTest {
+    @MockBean com.pawtrack.backend.cat.service.CatImageStorage images;
     @MockBean org.springframework.security.core.userdetails.UserDetailsService identityUsers;
 
     @Autowired

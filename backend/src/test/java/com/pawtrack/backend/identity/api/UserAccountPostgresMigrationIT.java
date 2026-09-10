@@ -65,7 +65,7 @@ class UserAccountPostgresMigrationIT {
                             "--spring.datasource.username=" + user, "--spring.datasource.password=" + password,
                             "--spring.datasource.driver-class-name=org.postgresql.Driver", "--spring.datasource.hikari.schema=" + schema,
                             "--spring.flyway.schemas=" + schema, "--spring.flyway.default-schema=" + schema,
-                            "--spring.flyway.enabled=true", "--spring.flyway.target=9",
+                            "--spring.flyway.enabled=true", "--spring.flyway.target=10",
                             "--spring.jpa.hibernate.ddl-auto=validate", "--spring.jpa.open-in-view=false",
                             "--spring.jpa.properties.hibernate.default_schema=" + schema,
                             "--logging.level.org.hibernate.SQL=INFO")) {

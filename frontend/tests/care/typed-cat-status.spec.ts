@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test'
 import type { Cat, CatDetail, CatHealthStatus, CatAdoptionStatus } from '../../src/api/types'
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/auth/me', route => route.fulfill({ status: 401, json: { message: 'Authentication required.' } }))
+})
+
 const cats: Cat[] = (['AVAILABLE', 'ADOPTED'] as CatAdoptionStatus[]).flatMap((adoptionStatus, index) =>
   (['NORMAL', 'UNDER_OBSERVATION', 'SICK'] as CatHealthStatus[]).map((healthStatus, offset) => ({
     id: index * 3 + offset + 1, name: `${adoptionStatus} ${healthStatus}`, healthStatus, adoptionStatus,
@@ -36,7 +40,7 @@ test('detail shows both dimensions and gates applications with active alerts', a
   for (const cat of cats) {
     await page.goto(`/cats/${cat.id}`)
     await expect(page.getByText(labels[cat.healthStatus], { exact: true })).toBeVisible()
-    const form = page.getByRole('button', { name: 'Send adoption application', exact: true })
+    const form = page.getByRole('link', { name: 'Sign in to apply', exact: true })
     if (cat.adoptionStatus === 'AVAILABLE' && cat.healthStatus === 'NORMAL') await expect(form).toBeVisible()
     else await expect(form).toHaveCount(0)
     if (cat.adoptionStatus === 'ADOPTED') {

@@ -1,5 +1,7 @@
 package com.pawtrack.backend.adoption.api;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
@@ -35,11 +37,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class AdoptionReviewIntegrationTest {
+    @Autowired UserAccountRepository accounts;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired AdoptionService service;
@@ -58,17 +62,15 @@ class AdoptionReviewIntegrationTest {
     private AdoptionApplicationResponse apply(String email) {
         AdoptionApplicationRequest req = new AdoptionApplicationRequest();
         req.setCatId(cat.getId());
-        req.setAdopterName("Alex");
-        req.setAdopterEmail(email);
         req.setNotes("A quiet home.");
-        return service.submitApplication(req);
+        return service.submitApplication(req, TestAccounts.adopter(accounts, email));
     }
 
     @Test
     void fullHttpFlow_returnsDtos_filtersQueue_andClosesCompetingApplications() throws Exception {
         String body = json.writeValueAsString(Map.of("catId", cat.getId(), "adopterName", " Alex ",
                 "adopterEmail", "ALEX@example.com", "notes", "A quiet home."));
-        JsonNode submitted = json.readTree(mvc.perform(post("/api/adoptions").header("Origin", "http://127.0.0.1:5173").contentType(MediaType.APPLICATION_JSON).content(body))
+        JsonNode submitted = json.readTree(mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).header("Origin", "http://127.0.0.1:5173").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.catName").value("Test companion"))
                 .andExpect(jsonPath("$.adopterName").value("Alex"))
@@ -86,20 +88,20 @@ class AdoptionReviewIntegrationTest {
         mvc.perform(get("/api/adoptions").param("status", "PENDING"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
         assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
-        assertFalse(service.getById(id).updatedAt().isBefore(service.getById(id).createdAt()));
+        assertFalse(service.getById(id, TestAccounts.staff()).updatedAt().isBefore(service.getById(id, TestAccounts.staff()).createdAt()));
     }
 
     @Test
     void invalidRequests_return400WithFieldErrors() throws Exception {
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"catId\":-1,\"adopterName\":\" \",\"adopterEmail\":\"bad\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.catId").exists())
-                .andExpect(jsonPath("$.errors.adopterName").exists()).andExpect(jsonPath("$.errors.adopterEmail").exists());
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                ;
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/api/cats").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" \"}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("{broken"))
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON).content("{broken"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
         mvc.perform(get("/api/adoptions").param("status", "UNKNOWN")).andExpect(status().isBadRequest());
         assertEquals(0, applications.count());
@@ -112,7 +114,7 @@ class AdoptionReviewIntegrationTest {
     }
 
     @Test
-    void duplicatePendingEmail_isCaseInsensitive_andCanReapplyAfterRejection() {
+    void duplicatePendingAccount_isStableAcrossNormalizedLoginEmail_andCanReapplyAfterRejection() {
         AdoptionApplicationResponse first = apply("alex@example.com");
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> apply(" ALEX@example.com ")).getStatusCode().value());
         service.rejectApplication(first.id());
@@ -131,9 +133,9 @@ class AdoptionReviewIntegrationTest {
         mvc.perform(patch("/api/adoptions/{id}/approve", approved.id())).andExpect(status().isConflict());
         mvc.perform(patch("/api/adoptions/{id}/reject", approved.id())).andExpect(status().isConflict());
         mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"NORMAL\"}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
-        assertEquals("APPROVED", service.getById(approved.id()).status());
+        assertEquals("APPROVED", service.getById(approved.id(), TestAccounts.staff()).status());
     }
 
     @Test
@@ -142,7 +144,7 @@ class AdoptionReviewIntegrationTest {
         health.create(cat.getId(), null, new BigDecimal("40.0"), 1);
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.approveApplication(pending.id())).getStatusCode().value());
         assertThrows(ResponseStatusException.class, () -> apply("other@example.com"));
-        assertEquals("PENDING", service.getById(pending.id()).status());
+        assertEquals("PENDING", service.getById(pending.id(), TestAccounts.staff()).status());
     }
 
     @Test

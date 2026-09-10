@@ -50,7 +50,9 @@ class CatImageUploadIntegrationTest {
     @BeforeEach
     void ensureUploadDirectory() throws Exception {
         Files.createDirectories(Paths.get("uploads"));
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity())
+                .defaultRequest(com.pawtrack.backend.support.StaffMvcTestConfiguration.staffRequest()).build();
     }
 
     @Test
@@ -64,7 +66,7 @@ class CatImageUploadIntegrationTest {
                 "file",
                 "test.jpg",
                 "image/jpeg",
-                new byte[]{1, 2, 3, 4}
+                com.pawtrack.backend.support.TestImages.image("jpeg")
         );
 
         MvcResult result = mockMvc.perform(

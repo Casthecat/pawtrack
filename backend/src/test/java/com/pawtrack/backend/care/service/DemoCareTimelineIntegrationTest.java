@@ -1,5 +1,7 @@
 package com.pawtrack.backend.care.service;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.service.AdoptionService;
 import com.pawtrack.backend.care.api.dto.HealthTimelineEventKind;
@@ -19,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoCareTimelineIntegrationTest {
 
+    @Autowired UserAccountRepository accounts;
     @Autowired CatRepository cats;
     @Autowired HealthTimelineService timelines;
     @Autowired AdoptionService adoptions;
@@ -44,9 +47,7 @@ class DemoCareTimelineIntegrationTest {
         Cat mochi = findCat("Mochi");
         AdoptionApplicationRequest request = new AdoptionApplicationRequest();
         request.setCatId(mochi.getId());
-        request.setAdopterName("Demo Applicant");
-        request.setAdopterEmail("demo@example.com");
-        assertEquals("PENDING", adoptions.submitApplication(request).status());
+        assertEquals("PENDING", adoptions.submitApplication(request, TestAccounts.adopter(accounts, "adopter@example.com")).status());
     }
 
     private Cat findCat(String name) {

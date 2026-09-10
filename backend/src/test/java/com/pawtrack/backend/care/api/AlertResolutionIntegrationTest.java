@@ -1,5 +1,7 @@
 package com.pawtrack.backend.care.api;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
@@ -45,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:alert-resolution;DB_CLOSE_DELAY=-1")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -53,6 +56,7 @@ class AlertResolutionIntegrationTest {
     private static final String BODY = """
             {"careType":"CHECKUP","note":"Temperature rechecked; resting comfortably."}
             """;
+    @Autowired UserAccountRepository accounts;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired Environment environment;
@@ -210,7 +214,7 @@ class AlertResolutionIntegrationTest {
     @Test
     void removedCloseEndpointCannotBypassWorkflow() throws Exception {
         Alert alert = alert(AlertType.FEVER);
-        mvc.perform(patch("/api/alerts/{id}/close", alert.getId())).andExpect(status().isNotFound());
+        mvc.perform(patch("/api/alerts/{id}/close", alert.getId())).andExpect(status().isForbidden());
         assertEquals(AlertStatus.OPEN, alerts.findById(alert.getId()).orElseThrow().getStatus());
         assertEquals(0, careRecords.count());
     }
@@ -318,7 +322,7 @@ class AlertResolutionIntegrationTest {
     }
 
     private void apply(int expectedStatus) throws Exception {
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON).content("""
                         {"catId":%d,"adopterName":"Alex","adopterEmail":"alex@example.com"}
                         """.formatted(cat.getId())))
                 .andExpect(status().is(expectedStatus));

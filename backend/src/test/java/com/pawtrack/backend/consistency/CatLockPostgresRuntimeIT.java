@@ -1,5 +1,7 @@
 package com.pawtrack.backend.consistency;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.pawtrack.backend.BackendApplication;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.domain.AdoptionStatus;
@@ -71,6 +73,7 @@ class CatLockPostgresRuntimeIT {
         properties.add("logging.level.org.hibernate.SQL", () -> "INFO");
     }
 
+    @Autowired UserAccountRepository accounts;
     @Autowired CatRepository cats;
     @Autowired AdoptionApplicationRepository applications;
     @Autowired AlertRepository alerts;
@@ -150,12 +153,24 @@ class CatLockPostgresRuntimeIT {
         assertEquals(CatAdoptionStatus.AVAILABLE, cats.findById(catId).orElseThrow().getAdoptionStatus());
     }
 
+    @Test
+    void sameOwnerSubmissionsWaitForCatAndKeepExactlyOnePendingApplication() throws Exception {
+        var principal = TestAccounts.adopter(accounts, "same-owner@example.com");
+        var request = new AdoptionApplicationRequest();
+        request.setCatId(catId);
+        assertEquals(List.of(200, 409), runWithCatLock(
+                () -> adoption.submitApplication(request, principal),
+                () -> adoption.submitApplication(request, principal)));
+        var pending = applications.findByCatIdAndStatus(catId, AdoptionStatus.PENDING);
+        assertEquals(1, pending.size());
+        assertEquals(principal.getAccountId(), pending.getFirst().getAdopterAccount().getId());
+        assertEquals(1, applications.count());
+    }
+
     private Long submit(String email) {
         var request = new AdoptionApplicationRequest();
         request.setCatId(catId);
-        request.setAdopterName("Demo applicant");
-        request.setAdopterEmail(email);
-        return adoption.submitApplication(request).id();
+        return adoption.submitApplication(request, TestAccounts.adopter(accounts, email)).id();
     }
 
     private Long fever() {

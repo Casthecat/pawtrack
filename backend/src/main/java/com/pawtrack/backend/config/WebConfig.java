@@ -28,6 +28,8 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
         Path path = Paths.get(uploadPath).toAbsolutePath().normalize();
         String location = path.toUri().toString();
+        // A directory may not exist until the first upload; URI conversion then omits '/'.
+        if (!location.endsWith("/")) location += "/";
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(location)
                 .setCachePeriod(3600);

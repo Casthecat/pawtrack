@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(
         classes = HealthAlertIntegrationTest.TestApplication.class,
         properties = {

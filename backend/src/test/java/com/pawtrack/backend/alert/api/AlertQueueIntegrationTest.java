@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:alert-queue;DB_CLOSE_DELAY=-1")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc

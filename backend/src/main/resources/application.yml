@@ -9,6 +9,10 @@ server:
         same-site: lax
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: jdbc:postgresql://localhost:5432/pawtrack
     username: pawtrack

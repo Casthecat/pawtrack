@@ -97,16 +97,7 @@ class CatStatusPostgresMigrationIT {
                     assertEquals(health.get(i), CatMapper.toDetailResponse(cat, null, false).getHealthStatus());
                     assertEquals(cat.getAdoptionStatus(), CatMapper.toDetailResponse(cat, null, false).getAdoptionStatus());
                 }
-                var adoption = context.getBean(AdoptionService.class);
-                var request = new AdoptionApplicationRequest();
-                request.setCatId(1L);
-                request.setAdopterName("Migration verifier");
-                request.setAdopterEmail("migration@example.com");
-                adoption.approveApplication(adoption.submitApplication(request).id());
-                var adopted = cats.findById(1L).orElseThrow();
-                assertEquals(CatAdoptionStatus.ADOPTED, adopted.getAdoptionStatus());
-                assertEquals(CatHealthStatus.NORMAL, adopted.getHealthStatus());
-                assertEquals(CatAdoptionStatus.ADOPTED, CatMapper.toResponse(adopted).getAdoptionStatus());
+
             }
             try (var connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
                 connection.setSchema(schema);
@@ -114,10 +105,29 @@ class CatStatusPostgresMigrationIT {
                      var row = sql.executeQuery("select status, adoption_status from cats where id = 1")) {
                     assertTrue(row.next());
                     assertEquals("LEGACY_ONLY_TEST_VALUE", row.getString("status"));
-                    assertEquals("ADOPTED", row.getString("adoption_status"));
+                    assertEquals("AVAILABLE", row.getString("adoption_status"));
                 }
             }
             assertEquals(0, migration.migrate().migrationsExecuted);
+            // Validate the current owner-bound adoption flow after upgrading this historical fixture.
+            try (var context = new SpringApplicationBuilder(com.pawtrack.backend.BackendApplication.class)
+                    .web(WebApplicationType.NONE).profiles("postgres-migration")
+                    .run("--spring.datasource.url=" + URL, "--spring.datasource.username=" + USER,
+                            "--spring.datasource.password=" + PASSWORD, "--spring.datasource.driver-class-name=org.postgresql.Driver",
+                            "--spring.datasource.hikari.schema=" + schema, "--spring.flyway.schemas=" + schema,
+                            "--spring.flyway.default-schema=" + schema, "--spring.flyway.enabled=true",
+                            "--spring.jpa.hibernate.ddl-auto=validate", "--spring.jpa.properties.hibernate.default_schema=" + schema)) {
+                var cats = context.getBean(CatRepository.class);
+                var adoption = context.getBean(AdoptionService.class);
+                var request = new AdoptionApplicationRequest();
+                request.setCatId(1L);
+                adoption.approveApplication(adoption.submitApplication(request, com.pawtrack.backend.support.TestAccounts.adopter(context.getBean(com.pawtrack.backend.identity.repo.UserAccountRepository.class), "migration@example.com")).id());
+                var adopted = cats.findById(1L).orElseThrow();
+                assertEquals(CatAdoptionStatus.ADOPTED, adopted.getAdoptionStatus());
+                assertEquals(CatHealthStatus.NORMAL, adopted.getHealthStatus());
+                assertEquals(CatAdoptionStatus.ADOPTED, CatMapper.toResponse(adopted).getAdoptionStatus());
+            }
+
         } finally {
             migration.clean();
         }

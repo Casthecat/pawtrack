@@ -1,5 +1,7 @@
 package com.pawtrack.backend.healthdata.api;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.BackendApplication;
@@ -33,12 +35,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // No outer test transaction: HTTP writes commit and repository assertions reload stored values.
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(classes = BackendApplication.class,
         properties = "spring.datasource.url=jdbc:h2:mem:health-correctness;DB_CLOSE_DELAY=-1")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class HealthObservationCorrectnessIntegrationTest {
+    @Autowired UserAccountRepository accounts;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired CatRepository cats;
@@ -175,7 +179,7 @@ class HealthObservationCorrectnessIntegrationTest {
     }
 
     private void apply(int expectedStatus) throws Exception {
-        mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, "alex@example.com"))).contentType(MediaType.APPLICATION_JSON).content("""
                         {"catId":%d,"adopterName":"Alex","adopterEmail":"alex@example.com"}
                         """.formatted(catId)))
                 .andExpect(status().is(expectedStatus));

@@ -1,5 +1,7 @@
 package com.pawtrack.backend.cat.api;
 
+import com.pawtrack.backend.support.TestAccounts;
+import com.pawtrack.backend.identity.repo.UserAccountRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.BackendApplication;
 import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
@@ -31,12 +33,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@com.pawtrack.backend.support.StaffRegression
 @SpringBootTest(classes = BackendApplication.class,
         properties = "spring.datasource.url=jdbc:h2:mem:typed-cat-status;DB_CLOSE_DELAY=-1")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class TypedCatStatusIntegrationTest {
+    @Autowired UserAccountRepository accounts;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired CatRepository cats;
@@ -151,7 +155,7 @@ class TypedCatStatusIntegrationTest {
         cats.saveAndFlush(cat);
         mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"ADOPTED\"}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         assertEquals(adoption, reload().getAdoptionStatus());
         assertEquals(healthStatus, reload().getHealthStatus());
     }
@@ -171,7 +175,7 @@ class TypedCatStatusIntegrationTest {
     private Cat reload() { return cats.findById(cat.getId()).orElseThrow(); }
 
     private long apply(String email, int expected) throws Exception {
-        var result = mvc.perform(post("/api/adoptions").contentType(MediaType.APPLICATION_JSON).content("""
+        var result = mvc.perform(post("/api/adoptions").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(TestAccounts.adopter(accounts, email))).contentType(MediaType.APPLICATION_JSON).content("""
                         {"catId":%d,"adopterName":"Demo applicant","adopterEmail":"%s"}
                         """.formatted(cat.getId(), email)))
                 .andExpect(status().is(expected)).andReturn().getResponse();

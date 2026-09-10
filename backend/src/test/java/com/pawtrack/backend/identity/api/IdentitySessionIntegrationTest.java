@@ -134,12 +134,13 @@ class IdentitySessionIntegrationTest {
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
     }
 
-    @Test void anonymousBusinessEndpointsRemainAccessibleWithoutAuthOrCsrf() throws Exception {
+    @Test void anonymousPublicReadsRemainAccessibleButStaffOperationsRequireLogin() throws Exception {
         assertEquals(0, accounts.count()); // No demo provisioning in the test/default profile.
-        mvc.perform(get("/api/adoptions")).andExpect(status().isOk());
-        mvc.perform(get("/api/alerts")).andExpect(status().isOk());
+        mvc.perform(get("/api/adoptions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/alerts")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/cats").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Anonymous demo\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/cats")).andExpect(status().isOk());
     }
 
     @Test void realCookieSessionIsHttpOnlySameSiteAndEndsAfterLogout() throws Exception {
