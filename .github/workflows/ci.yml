@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend / isolated H2 regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      # Invoke via bash because the wrapper is tracked without its executable bit.
+      - name: Complete default backend suite
+        run: bash ./mvnw --batch-mode --no-transfer-progress clean test
+
+  frontend-browser:
+    name: Frontend / build, lint and mocked Chromium
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Desktop and narrow frontend regression (mocked API, no retries)
+        run: npm run test:care
+      - name: Upload failed browser evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mocked-browser-failure
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  postgres:
+    name: PostgreSQL / migrations and targeted Cat locks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: pawtrack
+          POSTGRES_USER: pawtrack
+          POSTGRES_PASSWORD: pawtrack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pawtrack -d pawtrack"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PAWTRACK_TEST_JDBC_URL: jdbc:postgresql://localhost:5432/pawtrack
+      PAWTRACK_TEST_DB_USER: pawtrack
+      PAWTRACK_TEST_DB_PASSWORD: pawtrack
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: All historical migration integration tests through V10
+        run: >-
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dtest=PostgresMigrationIT,CareRecordPostgresMigrationIT,AlertResolutionPostgresMigrationIT,CatStatusPostgresMigrationIT,RemoveLegacyCatStatusPostgresMigrationIT,UserAccountPostgresMigrationIT,AdoptionOwnershipPostgresMigrationIT
+          test
+      - name: Four coordinated PostgreSQL row-lock execution histories
+        run: bash ./mvnw --batch-mode --no-transfer-progress -Dtest=CatLockPostgresRuntimeIT test
+
+  live-demo:
+    name: Live demo / real session, CSRF and ownership
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # The existing live runner uses Maven from the hosted runner's PATH.
+      - name: Check live backend toolchain
+        run: mvn --version
+      - run: npm ci
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Real disposable H2 demo and Vite (no API interception)
+        run: npm run test:live
+      # Playwright owns and tears down both process groups, also on test failure.
+      - name: Verify live server ports were released
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import net from 'node:net';
+          for (const port of [19091, 5173]) {
+            await new Promise((resolve, reject) => {
+              const server = net.createServer();
+              server.once('error', reject);
+              server.listen(port, '127.0.0.1', () => server.close(resolve));
+            });
+            console.log(`Live server port ${port} is free`);
+          }
+          NODE
+      - name: Upload failed live demo evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-demo-failure
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,5 +1,7 @@
 # PawTrack
 
+[![CI](https://github.com/Casthecat/pawtrack/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Casthecat/pawtrack/actions/workflows/ci.yml)
+
 PawTrack is a portfolio project for shelter cat care and adoption. It connects health observations with adoption decisions: an open care alert pauses adoption, and approving an application updates the cat and competing applications in one transaction.
 
 P1/P2 is frozen at `v1.0-portfolio-core`. P3 split Cat health and adoption state; P4.1/P4.2 add server-session authentication, STAFF-only operations and SPA login/logout. P4.3 binds new applications to ADOPTER accounts and adds private receipts and My applications. P4.4 freezes this authorization milestone with API deny-by-default, validated local image uploads and isolated demo credentials. Public registration and production deployment security remain deferred.
@@ -154,6 +156,17 @@ npm run test:live
 ```
 
 This starts its own fresh demo backend on 19091 and Vite on 5173, exercises both walkthroughs, and checks the narrow Care workspace. Both ports must be free; do not run a separate frontend on 5173 simultaneously. Java 21, Maven and the installed Playwright Chromium are required. The runner never reuses a running backend; its H2 data is disposable. Screenshot artifacts are in the ignored `frontend/test-results/live` directory.
+
+## Continuous integration
+
+[CI](.github/workflows/ci.yml) runs on pull requests and pushes to `main`, with four independent Ubuntu jobs:
+
+- `backend`: Java 21 and the complete isolated H2 regression suite.
+- `frontend-browser`: Node 22, clean npm install, build/lint, and mocked desktop/narrow Chromium regressions.
+- `postgres`: PostgreSQL 16 schema upgrades through V10, then four targeted real Cat row-lock histories in a separate step.
+- `live-demo`: a fresh real H2 backend and Vite exercising sessions, CSRF, authorization, ownership, adoption and care; server ports are checked after teardown even on failure.
+
+Maven/npm dependencies are cached. Browser failure screenshots/traces are retained for seven days; successful runs upload no artifacts. No application secrets are needed. These gates do not claim production load testing, full browser compatibility, deployment or a complete security audit. See [P5.1 commands, local verification and hosted-runner limits](docs/P5_1_CONTINUOUS_INTEGRATION.md). The badge reflects GitHub's workflow status; local verification alone does not establish a passing hosted run.
 
 ## Frozen P4 security boundary
 
