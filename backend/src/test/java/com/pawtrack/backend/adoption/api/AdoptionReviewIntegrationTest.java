@@ -10,6 +10,8 @@ import com.pawtrack.backend.adoption.service.AdoptionService;
 import com.pawtrack.backend.alert.domain.AlertStatus;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
 import com.pawtrack.backend.healthdata.service.HealthDataService;
@@ -83,7 +85,7 @@ class AdoptionReviewIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
         mvc.perform(get("/api/adoptions").param("status", "PENDING"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
-        assertEquals("ADOPTED", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
         assertFalse(service.getById(id).updatedAt().isBefore(service.getById(id).createdAt()));
     }
 
@@ -115,7 +117,7 @@ class AdoptionReviewIntegrationTest {
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> apply(" ALEX@example.com ")).getStatusCode().value());
         service.rejectApplication(first.id());
         assertEquals("PENDING", apply("alex@example.com").status());
-        assertEquals("NORMAL", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(cat.getId()).orElseThrow().getHealthStatus());
     }
 
     @Test
@@ -130,7 +132,7 @@ class AdoptionReviewIntegrationTest {
         mvc.perform(patch("/api/adoptions/{id}/reject", approved.id())).andExpect(status().isConflict());
         mvc.perform(patch("/api/cats/{id}/status", cat.getId()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"NORMAL\"}"))
                 .andExpect(status().isConflict());
-        assertEquals("ADOPTED", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
         assertEquals("APPROVED", service.getById(approved.id()).status());
     }
 
@@ -145,11 +147,15 @@ class AdoptionReviewIntegrationTest {
 
     @Test
     void unavailableStatesCannotReceiveApplications() {
-        for (String state : List.of("SICK", "UNDER_OBSERVATION", "ADOPTED")) {
-            cat.setStatus(state);
+        for (CatHealthStatus state : List.of(CatHealthStatus.SICK, CatHealthStatus.UNDER_OBSERVATION)) {
+            cat.setHealthStatus(state);
             cats.saveAndFlush(cat);
             assertThrows(ResponseStatusException.class, () -> apply("alex@example.com"));
         }
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
+        cat.setAdoptionStatus(CatAdoptionStatus.ADOPTED);
+        cats.saveAndFlush(cat);
+        assertThrows(ResponseStatusException.class, () -> apply("alex@example.com"));
         assertEquals(0, applications.count());
     }
 
@@ -169,7 +175,7 @@ class AdoptionReviewIntegrationTest {
         }
         assertEquals(1, service.list(AdoptionStatus.APPROVED).size());
         assertEquals(1, service.list(AdoptionStatus.REJECTED).size());
-        assertEquals("ADOPTED", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
     }
 
     private boolean approveAfter(CountDownLatch start, Long id) throws InterruptedException {
@@ -189,18 +195,21 @@ class AdoptionReviewIntegrationTest {
         health.create(cat.getId(), null, new BigDecimal("40.0"), 1);
         health.create(cat.getId(), null, new BigDecimal("40.2"), 1);
         assertEquals(1, alerts.count());
-        assertEquals("ADOPTED", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, cats.findById(cat.getId()).orElseThrow().getHealthStatus());
         var alert = alerts.findAll().getFirst();
         mvc.perform(patch("/api/alerts/{id}/resolve", alert.getId()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"careType\":\"CHECKUP\",\"note\":\"Staff rechecked temperature.\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.catId").value(cat.getId()))
                 .andExpect(jsonPath("$.status").value("CLOSED"));
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(cat.getId()).orElseThrow().getHealthStatus());
         mvc.perform(patch("/api/alerts/{id}/resolve", alert.getId()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"careType\":\"CHECKUP\",\"note\":\"Staff rechecked temperature.\"}"))
                 .andExpect(status().isConflict());
         health.create(cat.getId(), null, new BigDecimal("40.1"), 1);
         assertEquals(2, alerts.count());
-        assertEquals("ADOPTED", cats.findById(cat.getId()).orElseThrow().getStatus());
+        assertEquals(CatAdoptionStatus.ADOPTED, cats.findById(cat.getId()).orElseThrow().getAdoptionStatus());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.pawtrack.backend.healthdata.service;
 import com.pawtrack.backend.alert.domain.Alert;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.domain.HealthData;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
@@ -63,6 +64,6 @@ class HealthMonitorServiceIntegrationTest {
         assertNotNull(alerts.get(0).getId());
 
         Cat updatedCat = catRepository.findById(savedCat.getId()).orElseThrow();
-        assertEquals("UNDER_OBSERVATION", updatedCat.getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, updatedCat.getHealthStatus());
     }
 }

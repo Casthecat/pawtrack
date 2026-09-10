@@ -2,6 +2,7 @@ package com.pawtrack.backend.cat.api;
 
 import com.pawtrack.backend.alert.service.AlertService;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.service.CatService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class CatControllerWebMvcTest {
     @Test
     void getById_returnsCatResponse() throws Exception {
         Cat cat = new Cat("Mochi");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
 
         when(catService.getById(1L)).thenReturn(cat);
 

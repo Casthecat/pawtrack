@@ -9,6 +9,7 @@ import com.pawtrack.backend.alert.domain.AlertType;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.care.repo.CareRecordRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,7 +87,7 @@ class HealthObservationCorrectnessIntegrationTest {
                 .andExpect(status().isOk());
         assertEquals(AlertStatus.CLOSED, alerts.findById(alertId).orElseThrow().getStatus());
         assertEquals(1, careRecords.count());
-        assertEquals("NORMAL", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(catId).orElseThrow().getHealthStatus());
         apply(201);
     }
 
@@ -99,7 +100,7 @@ class HealthObservationCorrectnessIntegrationTest {
         assertEquals(1, observations.count());
         boolean fever = new BigDecimal(temperature).compareTo(new BigDecimal("39.5")) > 0;
         assertEquals(fever ? 1 : 0, alerts.count());
-        assertEquals(fever ? "UNDER_OBSERVATION" : "NORMAL", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(fever ? CatHealthStatus.UNDER_OBSERVATION : CatHealthStatus.NORMAL, cats.findById(catId).orElseThrow().getHealthStatus());
         if (fever) assertEquals(AlertStatus.OPEN, alerts.findAll().getFirst().getStatus());
     }
 
@@ -114,7 +115,8 @@ class HealthObservationCorrectnessIntegrationTest {
         assertEquals(0, observations.count());
         assertEquals(0, alerts.count());
         var after = cats.findById(catId).orElseThrow();
-        assertEquals(before.getStatus(), after.getStatus());
+        assertEquals(before.getHealthStatus(), after.getHealthStatus());
+        assertEquals(before.getAdoptionStatus(), after.getAdoptionStatus());
         assertEquals(before.getUpdatedAt(), after.getUpdatedAt());
     }
 
@@ -127,7 +129,7 @@ class HealthObservationCorrectnessIntegrationTest {
         assertEquals(1, observations.count());
         assertNull(observations.findAll().getFirst().getTemperatureC());
         assertEquals(0, alerts.count());
-        assertEquals("NORMAL", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.NORMAL, cats.findById(catId).orElseThrow().getHealthStatus());
     }
 
     private long record(String temperature) throws Exception {
@@ -167,7 +169,7 @@ class HealthObservationCorrectnessIntegrationTest {
         var alert = alerts.findAll().getFirst();
         assertEquals(AlertStatus.OPEN, alert.getStatus());
         assertEquals(AlertType.FEVER, alert.getType());
-        assertEquals("UNDER_OBSERVATION", cats.findById(catId).orElseThrow().getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, cats.findById(catId).orElseThrow().getHealthStatus());
         apply(409);
         assertEquals(0, applications.count());
     }

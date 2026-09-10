@@ -9,6 +9,7 @@ import com.pawtrack.backend.adoption.repo.AdoptionApplicationRepository;
 import com.pawtrack.backend.alert.domain.AlertStatus;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,7 @@ public class AdoptionService {
         requirePending(app);
         requireAvailable(app.getCat());
         app.setStatus(AdoptionStatus.APPROVED);
-        app.getCat().setStatus("ADOPTED");
+        app.getCat().setAdoptionStatus(CatAdoptionStatus.ADOPTED);
         // Serialize decisions on a cat, including decisions on different applications.
         for (AdoptionApplication other : applications.findByCatIdAndStatus(app.getCat().getId(), AdoptionStatus.PENDING)) {
             if (!other.getId().equals(id)) other.setStatus(AdoptionStatus.REJECTED);

@@ -5,6 +5,7 @@ import com.pawtrack.backend.alert.domain.Alert;
 import com.pawtrack.backend.alert.domain.AlertType;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,7 +84,7 @@ class HealthAlertIntegrationTest {
         assertTrue(alerts.stream().anyMatch(a -> a.getType() == AlertType.FEVER));
 
         Cat updated = catRepository.findById(savedCat.getId()).orElseThrow();
-        assertEquals("UNDER_OBSERVATION", updated.getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, updated.getHealthStatus());
     }
 
     @SpringBootConfiguration

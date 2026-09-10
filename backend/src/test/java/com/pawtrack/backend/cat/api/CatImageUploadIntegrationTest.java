@@ -3,6 +3,7 @@ package com.pawtrack.backend.cat.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +56,7 @@ class CatImageUploadIntegrationTest {
     void uploadImage_storesFile_updatesEntity_and_servesStatic() throws Exception {
 
         Cat cat = new Cat("Kumo");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
         Cat savedCat = catRepository.save(cat);
 
         MockMultipartFile file = new MockMultipartFile(

@@ -4,6 +4,7 @@ import com.pawtrack.backend.alert.domain.AlertStatus;
 import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.alert.service.AlertService;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.cat.service.CatService;
 import com.pawtrack.backend.healthdata.domain.HealthData;
@@ -51,7 +52,7 @@ class CatDashboardIntegrationTest {
     @Test
     void dashboard_returns_temperature_alert_and_streamUrl() throws Exception {
         Cat cat = new Cat("Mochi");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
         cat.setStreamUrl("https://stream.example/cam/1");
 
         HealthData healthData = new HealthData();
@@ -71,7 +72,7 @@ class CatDashboardIntegrationTest {
     @Test
     void dashboard_handles_missing_health_data() throws Exception {
         Cat cat = new Cat("Nori");
-        cat.setStatus("NORMAL");
+        cat.setHealthStatus(CatHealthStatus.NORMAL);
 
         when(catRepository.findById(2L)).thenReturn(Optional.of(cat));
         when(healthDataRepository.findFirstByCatIdOrderByTsDescIdDesc(2L)).thenReturn(Optional.empty());

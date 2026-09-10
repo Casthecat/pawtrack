@@ -5,6 +5,8 @@ import com.pawtrack.backend.alert.repo.AlertRepository;
 import com.pawtrack.backend.cat.api.dto.CatDetailResponse;
 import com.pawtrack.backend.cat.api.mapper.CatMapper;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import com.pawtrack.backend.healthdata.domain.HealthData;
 import com.pawtrack.backend.healthdata.repo.HealthDataRepository;
@@ -45,7 +47,6 @@ public class CatService {
     public Cat create(String name) {
         Cat cat = new Cat();
         cat.setName(name.trim());
-        cat.setStatus("NORMAL");
         return catRepository.save(cat);
     }
 
@@ -70,10 +71,17 @@ public class CatService {
     @Transactional
     public Cat updateStatus(Long id, String status) {
         Cat cat = getForUpdate(id);
-        if ("ADOPTED".equals(cat.getStatus()) || "ADOPTED".equals(status)) {
+        if (cat.getAdoptionStatus() == CatAdoptionStatus.ADOPTED || "ADOPTED".equals(status)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Adoption status is managed by the application review process.");
         }
-        cat.setStatus(status);
+        // Preserve the old request contract without permitting adoption-state writes.
+        CatHealthStatus healthStatus = switch (status) {
+            case "NORMAL", "ADOPTABLE" -> CatHealthStatus.NORMAL;
+            case "UNDER_OBSERVATION" -> CatHealthStatus.UNDER_OBSERVATION;
+            case "SICK" -> CatHealthStatus.SICK;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported cat status");
+        };
+        cat.setHealthStatus(healthStatus);
         return catRepository.save(cat);
     }
 

@@ -4,6 +4,7 @@ import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.service.AdoptionService;
 import com.pawtrack.backend.care.api.dto.HealthTimelineEventKind;
 import com.pawtrack.backend.cat.domain.Cat;
+import com.pawtrack.backend.cat.domain.CatHealthStatus;
 import com.pawtrack.backend.cat.repo.CatRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +39,7 @@ class DemoCareTimelineIntegrationTest {
         assertEquals(1, timeline.events().stream()
                 .filter(event -> event.eventKind() == HealthTimelineEventKind.CARE_RECORD)
                 .count());
-        assertEquals("UNDER_OBSERVATION", nori.getStatus());
+        assertEquals(CatHealthStatus.UNDER_OBSERVATION, nori.getHealthStatus());
 
         Cat mochi = findCat("Mochi");
         AdoptionApplicationRequest request = new AdoptionApplicationRequest();
