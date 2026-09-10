@@ -1,12 +1,24 @@
 # PawTrack 当前实现架构
 
-更新：2026-09-10。项目面向求职作品集，P1/P2 已冻结为 `v1.0-portfolio-core`；当前增量 P3.2 已完成 API、前端与数据库的独立状态迁移。实现背景与明确边界见 [项目梳理](../docs/PROJECT_REVIEW.md)。
+更新：2026-09-10。项目面向求职作品集，P1/P2 已冻结为 `v1.0-portfolio-core`；P3 独立状态迁移已完成，当前增量 P4.1 建立身份与服务端 session 认证基础。实现背景与明确边界见 [项目梳理](../docs/PROJECT_REVIEW.md)。
 
 ## 运行结构
 
-React + TypeScript + Vite 通过 REST API 调用 Java 21 / Spring Boot 3.3.6。后端是按业务模块组织的单体应用，持久开发环境使用 PostgreSQL 与 Flyway V1–V8，JPA 使用 validate。测试及 demo profile 使用独立 H2 内存库，并允许 create-drop，避免依赖开发数据。
+React + TypeScript + Vite 通过 REST API 调用 Java 21 / Spring Boot 3.3.6。后端是按业务模块组织的单体应用，持久开发环境使用 PostgreSQL 与 Flyway V1–V9，JPA 使用 validate。测试及 demo profile 使用独立 H2 内存库，并允许 create-drop，避免依赖开发数据。
 
-模块：cat、healthdata、alert、adoption、care。各模块按 api（controller、DTO、mapper）、service、domain 和 repo 组织；这是包级组织约定。Controller 不直接访问 Repository，也不向客户端返回实体。领养、护理时间线、预警队列和处理响应在服务事务内组装 DTO；部分旧猫咪/健康接口在 controller 映射已读取的标量或关联 ID。全局关闭 open-in-view。
+模块：cat、healthdata、alert、adoption、care、identity。各模块按 api（controller、DTO、mapper）、service、domain 和 repo 组织；这是包级组织约定。Controller 不直接访问 Repository，也不向客户端返回实体。领养、护理时间线、预警队列和处理响应在服务事务内组装 DTO；部分旧猫咪/健康接口在 controller 映射已读取的标量或关联 ID。全局关闭 open-in-view。
+
+## 身份与 session 认证（P4.1，过渡阶段）
+
+identity 模块新增 UserAccount（规范化 email、displayName、passwordHash、STAFF/ADOPTER、时间戳）及 V9 user_accounts 表。邮箱在内部创建服务和登录查询中使用 trim + Locale.ROOT 小写，数据库唯一约束防止重复，V9 另校验规范化存储和角色值。PasswordEncoder 使用 Spring Security DelegatingPasswordEncoder，当前写入 BCrypt；没有公开注册接口。
+
+使用标准表单认证过滤器、数据库 UserDetailsService 和服务端 HTTP session；不引入 JWT/refresh token，因为当前单 SPA、单体后端不需要另一套 token 生命周期。principal 是独立 AccountPrincipal 快照，不是 JPA 实体；认证后密码凭据被擦除。POST /api/auth/login 接受 form-urlencoded email/password，成功返回安全的用户 DTO；GET /api/auth/me 未登录返回 401；POST /api/auth/logout 使用框架退出流程使 session 失效。
+
+GET /api/auth/csrf 返回 headerName 和经过框架 XOR 编码的 token，并写入 HttpOnly、SameSite=Lax 的 XSRF-TOKEN cookie。未来 SPA 使用响应中的 token 作为 X-XSRF-TOKEN 请求头，保留 cookie；登录和退出后重新获取。所有认证路径的非安全方法，以及任何已认证 session 的非安全请求，都检查 CSRF。匿名业务写请求为兼容现有 demo 暂不要求 token；这不是完整授权方案。
+
+当前仅 /api/auth/me 要求登录；其余路径的授权规则仍为 permitAll，未设置 STAFF/ADOPTER 业务权限或申请归属检查。前端保持原样，匿名领养和护理流程继续运行。登录后的 API 调用必须遵循 CSRF 契约，P4.2/P4.3 再接入前端并实施权限与所有权。
+
+session 使用框架 fixation 防护、30 分钟空闲超时、仅 cookie 跟踪，JSESSIONID 为 HttpOnly/SameSite=Lax。localhost HTTP 验证不代表 HTTPS 安全；Secure cookie、TLS、代理信任配置属于后续部署。demo profile 单独创建两个带编码密码的虚构账户，非 demo profile 不创建；凭据、准确契约和验证边界见 [P4.1 报告](../docs/P4_1_IDENTITY_SESSION.md)。
 
 ## 猫的独立状态（P3.1 / P3.2）
 
@@ -80,8 +92,8 @@ Vite 的 /api 和 /uploads 代理连接本地后端。错误页面区分网络�
 
 ## 当前边界
 
-这是本地 demo，没有身份认证、角色授权或申请所有权验证；“工作人员页面”是演示入口。不得直接承载真实申请人数据。相机 URL 存在于历史模型中，但前端未提供私有直播能力。
+这是本地 demo，已有 session 身份认证，但没有业务角色授权或申请所有权验证；“工作人员页面”是演示入口。不得直接承载真实申请人数据。相机 URL 存在于历史模型中，但前端未提供私有直播能力。
 
-P3.2 完整默认后端套件通过 86 个用例，PostgreSQL 迁移验证通过 10 个用例（含 V7 回填、V8 删除与保留 typed 值、Hibernate validate），CatLockPostgresRuntimeIT 通过 3 个用例。后者保留真实 Spring 事务和 pg_blocking_pids 锁等待验证。前端 build/lint、16 个桌面/窄屏 mocked 浏览器用例，以及真实 demo 验证见 [P3.2 报告](../docs/P3_2_COMPLETE_TYPED_STATUS.md)。历史结果保留在 [P3.1 报告](../docs/P3_1_TYPED_CAT_STATUS.md) 和 [冻结报告](../docs/P2_4B_MILESTONE_FREEZE.md)。
+P4.1 完整后端套件通过 96 个用例，PostgreSQL 迁移验证通过 11 个用例，CatLockPostgresRuntimeIT 通过 3 个用例。前端源码不变，build/lint、16 个 mocked 浏览器用例及真实 demo 结果见 [P4.1 报告](../docs/P4_1_IDENTITY_SESSION.md)。历史记录保留在 [P3.2 报告](../docs/P3_2_COMPLETE_TYPED_STATUS.md)、[P3.1 报告](../docs/P3_1_TYPED_CAT_STATUS.md) 和 [冻结报告](../docs/P2_4B_MILESTONE_FREEZE.md)。
 
-这些证据不代表所有线程交错、生产并发吞吐或分布式写入保证。列表缺少活跃预警信息、未分页、人工决策新鲜度、时间线快照、直接 SQL 绕过应用约束、文件上传与权限边界仍是明确债务。认证、真实 IoT、AI/ML、通知、微服务、Kafka、实时预警流与部署不在此里程碑内。
+这些证据不代表所有线程交错、生产并发吞吐或分布式写入保证。列表缺少活跃预警信息、未分页、人工决策新鲜度、时间线快照、直接 SQL 绕过应用约束、文件上传与权限边界仍是明确债务。业务授权、申请所有权、注册、认证 UI、真实 IoT、AI/ML、通知、微服务、Kafka、实时预警流与部署不在 P4.1 内。

@@ -1,6 +1,5 @@
 package com.pawtrack.backend.cat.api;
 
-import com.pawtrack.backend.BackendApplication;
 import com.pawtrack.backend.adoption.api.dto.AdoptionApplicationRequest;
 import com.pawtrack.backend.adoption.service.AdoptionService;
 import com.pawtrack.backend.cat.api.mapper.CatMapper;
@@ -78,7 +77,7 @@ class CatStatusPostgresMigrationIT {
                 }
             }
 
-            try (var context = new SpringApplicationBuilder(BackendApplication.class)
+            try (var context = new SpringApplicationBuilder(com.pawtrack.backend.support.PreIdentityMigrationApplication.class)
                     .web(WebApplicationType.NONE).profiles("postgres-migration")
                     .run("--spring.datasource.url=" + URL,
                             "--spring.datasource.username=" + USER, "--spring.datasource.password=" + PASSWORD,

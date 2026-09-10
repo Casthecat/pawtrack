@@ -29,10 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = CatController.class)
-@Import(CatService.class)
+@Import({CatService.class, com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class})
 @TestPropertySource(properties = "spring.autoconfigure.exclude=org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration")
 @ContextConfiguration(classes = CatDashboardIntegrationTest.WebMvcTestConfig.class)
 class CatDashboardIntegrationTest {
+    @MockBean org.springframework.security.core.userdetails.UserDetailsService identityUsers;
 
     @Autowired
     private MockMvc mockMvc;

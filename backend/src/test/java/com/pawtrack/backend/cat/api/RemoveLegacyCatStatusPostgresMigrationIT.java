@@ -1,6 +1,5 @@
 package com.pawtrack.backend.cat.api;
 
-import com.pawtrack.backend.BackendApplication;
 import com.pawtrack.backend.cat.api.mapper.CatMapper;
 import com.pawtrack.backend.cat.domain.CatAdoptionStatus;
 import com.pawtrack.backend.cat.domain.CatHealthStatus;
@@ -62,7 +61,7 @@ class RemoveLegacyCatStatusPostgresMigrationIT {
                 v8.validate();
                 assertEquals(0, v8.migrate().migrationsExecuted);
             }
-            try (var context = new SpringApplicationBuilder(BackendApplication.class)
+            try (var context = new SpringApplicationBuilder(com.pawtrack.backend.support.PreIdentityMigrationApplication.class)
                     .web(WebApplicationType.NONE).profiles("postgres-migration")
                     .run("--spring.datasource.url=" + URL,
                             "--spring.datasource.username=" + USER, "--spring.datasource.password=" + PASSWORD,

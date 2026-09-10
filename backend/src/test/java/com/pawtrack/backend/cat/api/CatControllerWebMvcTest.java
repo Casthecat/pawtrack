@@ -16,8 +16,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@org.springframework.context.annotation.Import(com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class)
 @WebMvcTest(controllers = CatController.class)
 class CatControllerWebMvcTest {
+    @MockBean org.springframework.security.core.userdetails.UserDetailsService identityUsers;
 
     @Autowired
     private MockMvc mockMvc;

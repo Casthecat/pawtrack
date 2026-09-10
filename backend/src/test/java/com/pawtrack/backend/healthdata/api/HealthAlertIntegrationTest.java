@@ -96,7 +96,10 @@ class HealthAlertIntegrationTest {
             "com.pawtrack.backend.alert.service",
             "com.pawtrack.backend.cat.service"
     })
-    @Import(HealthDataController.class)
+    @Import({HealthDataController.class,
+            com.pawtrack.backend.identity.security.SessionSecurityConfiguration.class,
+            com.pawtrack.backend.identity.security.AccountDetailsService.class,
+            com.pawtrack.backend.identity.security.PasswordConfiguration.class})
     static class TestApplication {
     }
 }
