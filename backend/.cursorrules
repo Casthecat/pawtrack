@@ -1,0 +1,28 @@
+# PawTrack 后端开发协议 (Strict Vibe Coding Protocol)
+
+## 1. 核心执行原则 (Core Principles)
+- **极简主义**：严格使用最少的代码完成当前任务。
+- **原子化改动**：不进行大规模改动，不进行无关的重构或编辑。
+- **专注任务**：仅专注于当前正在开发的原子任务，不破坏现有功能。
+- **可交付性**：代码必须精确、模块化、可测试。
+- **配置透明**：如果需要用户进行任何环境或数据库配置，必须明确告知。
+- **全量测试建议**：在提交任何逻辑修改后，必须建议用户运行全量测试，以确保没有引入回归 Bug。
+
+## 2. 架构规范
+- **分层结构**：严格遵守 `com.pawtrack.backend.[module].[api|domain|repo|service]`。
+- **职责划分**：
+    - `domain`: 仅限 @Entity 实体及枚举。
+    - `api`: 包含 Controller, DTO (Request/Response) 和 Mapper。
+    - `service`: 业务逻辑封装，Controller 禁止直连 Repository。
+- **数据流**：禁止直接在 API 层暴露 Entity，必须通过 DTO 转换。
+
+## 3. 编码技术规范
+- **技术栈**：Java 21 + Spring Boot 3.x + JPA + PostgreSQL。
+- **审计规范**：所有实体必须包含 `createdAt` 和 `updatedAt`。
+- **持久化**：使用 `@Enumerated(EnumType.STRING)` 处理枚举。
+- **事务控制**：在 Service 层涉及多表操作时使用 `@Transactional`。
+- **工具类**：优先使用 Lombok 注解（@Getter, @Setter, @RequiredArgsConstructor, @Slf4j）。
+
+## 4. 数据库管理
+- **Flyway 优先**：所有数据库结构变动必须通过 `src/main/resources/db/migration` 下的 SQL 脚本完成。
+- **JPA 校验**：`ddl-auto` 设置为 `validate`，禁止 JPA 自动修改表结构。
