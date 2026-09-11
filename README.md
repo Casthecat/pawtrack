@@ -31,7 +31,7 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 Open [PawTrack](http://127.0.0.1:5173). The demo binds the backend to loopback port 9090 and creates six sample cats in a separate in-memory H2 database. Restarting the backend resets all demo data. It does not use the development PostgreSQL database. Photos use a neutral illustration when no image is available.
 
-Sign in at `/login` to access Staff workspace. These **DEMO-ONLY** accounts require the `demo` profile, a named in-memory H2 datasource and `create-drop`, with encoded passwords. Persistent demo datasource configuration is rejected before JPA initialization; the seeder also checks the actual database connection:
+Sign in at `/login` to access Staff workspace. In the local demo, these **DEMO-ONLY** accounts require the `demo` profile, a named in-memory H2 datasource and `create-drop`, with encoded passwords. Persistent demo datasource configuration is rejected before JPA initialization; the seeder also checks the actual database connection:
 
 - STAFF: `staff@example.com` / `PawTrack-demo-staff!`
 - ADOPTER: `adopter@example.com` / `PawTrack-demo-adopter!`
@@ -159,14 +159,23 @@ This starts its own fresh demo backend on 19091 and Vite on 5173, exercises both
 
 ## Continuous integration
 
-[CI](.github/workflows/ci.yml) runs on pull requests and pushes to `main`, with four independent Ubuntu jobs:
+[CI](.github/workflows/ci.yml) runs on pull requests and pushes to `main`, with five independent Ubuntu jobs:
 
+- `docker-image`: builds the repository-root Dockerfile, then health-checks the image against disposable PostgreSQL using the guarded cloud profile; no image publishing.
 - `backend`: Java 21 and the complete isolated H2 regression suite.
 - `frontend-browser`: Node 22, clean npm install, build/lint, and mocked desktop/narrow Chromium regressions.
-- `postgres`: PostgreSQL 16 schema upgrades through V10, then four targeted real Cat row-lock histories in a separate step.
+- `postgres`: PostgreSQL 16 schema upgrades through V10, then four targeted real Cat row-lock histories and a separate disposable cloud-profile startup check.
 - `live-demo`: a fresh real H2 backend and Vite exercising sessions, CSRF, authorization, ownership, adoption and care; server ports are checked after teardown even on failure.
 
 Maven/npm dependencies are cached. Browser failure screenshots/traces are retained for seven days; successful runs upload no artifacts. No application secrets are needed. These gates do not claim production load testing, full browser compatibility, deployment or a complete security audit. See [P5.1 commands, local verification and hosted-runner limits](docs/P5_1_CONTINUOUS_INTEGRATION.md). The badge reflects GitHub's workflow status; local verification alone does not establish a passing hosted run.
+
+## Public portfolio demo on Render
+
+P5.2 packages React and Spring Boot into one Docker Web Service: SPA, `/api/**` and `/uploads/**` share one HTTPS origin. [Render Blueprint](render.yaml) follows `main` after CI passes and provisions a dedicated disposable PostgreSQL database. It uses the separate guarded `demo-cloud` profile; ordinary/default profiles never provision known demo credentials.
+
+This is **portfolio-only**, not a production service. Accounts are public fake fixtures: do not enter real applicant data. Free hosting may cold-start. Uploaded portraits are **ephemeral** and must not be expected to survive restart/redeploy; PostgreSQL workflow state survives ordinary restarts. A full seed reset requires manual recreation of the dedicated demo database, then redeployment.
+
+See [P5.2 deployment steps, safety boundary and verification](docs/P5_2_RENDER_DEMO.md). The first Render deployment still requires dashboard setup and HTTPS verification; no hosted URL is claimed yet.
 
 ## Frozen P4 security boundary
 

@@ -1,0 +1,16 @@
+**/.git
+**/node_modules
+**/target
+**/dist
+**/test-results
+**/playwright-report
+**/uploads
+**/*.log
+**/.env
+**/.env.*
+**/*.local
+.local
+.codex
+.agents
+.vscode
+docs

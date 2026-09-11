@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Configuration
-@Profile("demo")
+@Profile({"demo", "demo-cloud"})
 public class DemoData {
     @Bean
     CommandLineRunner seedDemo(
