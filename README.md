@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Casthecat/pawtrack/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Casthecat/pawtrack/actions/workflows/ci.yml)
 
+**[Live Demo → pawtrack-demo.onrender.com](https://pawtrack-demo.onrender.com/)** · [Hosted verification](docs/P5_2_RENDER_DEMO.md#hosted-verification)
+
 PawTrack is a portfolio project for shelter cat care and adoption. It connects health observations with adoption decisions: an open care alert pauses adoption, and approving an application updates the cat and competing applications in one transaction.
 
 P1/P2 is frozen at `v1.0-portfolio-core`. P3 split Cat health and adoption state; P4.1/P4.2 add server-session authentication, STAFF-only operations and SPA login/logout. P4.3 binds new applications to ADOPTER accounts and adds private receipts and My applications. P4.4 freezes this authorization milestone with API deny-by-default, validated local image uploads and isolated demo credentials. Public registration and production deployment security remain deferred.
@@ -175,7 +177,7 @@ P5.2 packages React and Spring Boot into one Docker Web Service: SPA, `/api/**` 
 
 This is **portfolio-only**, not a production service. Accounts are public fake fixtures: do not enter real applicant data. Free hosting may cold-start. Uploaded portraits are **ephemeral** and must not be expected to survive restart/redeploy; PostgreSQL workflow state survives ordinary restarts. A full seed reset requires manual recreation of the dedicated demo database, then redeployment.
 
-See [P5.2 deployment steps, safety boundary and verification](docs/P5_2_RENDER_DEMO.md). The first Render deployment still requires dashboard setup and HTTPS verification; no hosted URL is claimed yet.
+**Live:** [https://pawtrack-demo.onrender.com/](https://pawtrack-demo.onrender.com/). Hosted smoke verification on **2026-09-11 (UTC)** passed: HTTPS gallery/deep links, health `UP`, same-origin API requests, fake-account ADOPTER/STAFF login and read permissions, Secure session/CSRF cookies, CSRF rejection and logout. No adoption/care/upload data was changed. See [the exact hosted verification scope and limits](docs/P5_2_RENDER_DEMO.md#hosted-verification), alongside deployment and reset instructions.
 
 ## Frozen P4 security boundary
 

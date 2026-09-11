@@ -1,6 +1,26 @@
 # P5.2: Single-origin Render portfolio demo
 
-This is deployment configuration for a **public portfolio demo**, not a production service. No Render resources have been created by this implementation. Never enter real applicant/contact/medical data. Anyone can use the documented fake STAFF/ADOPTER accounts; account ownership separates demo personas, not individual visitors sharing those credentials.
+The **public portfolio demo** is deployed at **[https://pawtrack-demo.onrender.com/](https://pawtrack-demo.onrender.com/)**. This is not a production service. Never enter real applicant/contact/medical data. Anyone can use the documented fake STAFF/ADOPTER accounts; account ownership separates demo personas, not individual visitors sharing those credentials.
+
+## Hosted verification
+
+**Live Demo:** [pawtrack-demo.onrender.com](https://pawtrack-demo.onrender.com/). Verified on **2026-09-11, approximately 02:07 UTC** (2026-09-10 evening in America/New_York), using direct HTTPS requests and a fresh headless Chromium session against the public URL. TLS certificate validation remained enabled. No API interception or local backend was used.
+
+Verified observations:
+
+- HTTPS `/` returned the packaged HTML and Chromium rendered the cat gallery. `/api/cats` returned JSON with six cats at verification time; this shared demo state may change.
+- `/actuator/health` returned HTTP 200 and `status: UP`.
+- Direct requests to `/cats/1`, `/login`, `/applications` and `/staff/care` returned the SPA shell. The cat detail page rendered and survived a browser reload. Anonymous browser navigation to the staff workspace redirected to login; serving its shell does not grant access to protected data.
+- Browser-observed API requests used `https://pawtrack-demo.onrender.com`, with no localhost API dependency or browser page errors during this smoke check.
+- The documented fake ADOPTER and STAFF accounts both logged in through the hosted UI; `/api/auth/me` returned the expected role. Session cookies were `Secure`, `HttpOnly`, `SameSite=Lax`; the CSRF cookie was also `Secure`.
+- ADOPTER could read `/api/me/adoptions` (200) and received 403 for the STAFF review queue. STAFF could read the review and OPEN-alert queues (200).
+- Anonymous reads of `/api/adoptions` and `/api/auth/me` returned JSON 401. An unclassified `/api/unclassified` read returned JSON 401 anonymously and 403 for both authenticated roles.
+- Login without a CSRF token returned 403. Normal UI login/logout succeeded with the existing CSRF flow; after logout `/api/auth/me` returned 401.
+- `/uploads/nonexistent-verification.png` returned JSON 404 rather than SPA HTML.
+
+This was a **non-mutating business-data smoke check**: only authentication sessions were created/ended. No applications were submitted, no approvals/rejections or alert resolutions were performed, and no files were uploaded. Consequently, hosted ownership/receipt transitions, successful image upload/retrieval, adoption/care writes, reset behavior and upload loss across redeploy were **not** re-verified here. Those have separate local/CI evidence below where applicable; that evidence is not relabeled as hosted execution.
+
+The public endpoint does not establish the exact deployed commit, current GitHub run status, live Flyway history, Render dashboard configuration, plan/memory limits, cold-start behavior or persistence guarantees. These were not independently inspected in this check. This is not a security audit, load test, uptime guarantee or production-readiness claim.
 
 ## Build and routing
 
@@ -47,13 +67,13 @@ A normal restart/redeploy preserves PostgreSQL adoption/care state, but loses in
 
 For a reset: suspend the demo Web Service; verify that `pawtrack-demo-db` is exclusively disposable; delete only that demo database instance in Render; sync the Blueprint to recreate it with `databaseName: pawtrack_portfolio_demo`; resync the service's database references and redeploy/resume the service. Recheck six cats, the three fake accounts and Nori's open care alert. Never apply this reset procedure to development or real data.
 
-## Manual Render deployment steps
+## Render deployment/recreation steps
 
 1. Review/merge these changes into `Casthecat/pawtrack` on `main`. Wait for all existing CI jobs plus the new cloud-profile PostgreSQL step to pass.
 2. In Render, choose **New → Blueprint**, connect the GitHub repository and select the root `render.yaml` from `main`. Keep the Docker context at the repository root; do not set the root directory to `backend` or `frontend`.
 3. Review the two resources, region and free-plan availability before creating anything. No service disk is configured. Verify the dedicated database name and acknowledgement. If a free database is unavailable, resolve that dashboard/account constraint explicitly rather than silently selecting a paid plan or reusing an unrelated database.
 4. Create/sync the Blueprint. Verify the service environment references are populated with the new database values, the profile is only `demo-cloud`, and the health path is `/actuator/health`. Do not paste a raw Render `postgresql://...` connection string into Spring's JDBC URL.
-5. Watch the initial Docker build/startup and health check. Confirm Flyway reaches V10 and Hibernate validation succeeds. Open the service's assigned **HTTPS** `onrender.com` URL; no public hostname is assumed or invented in this repository.
+5. Watch the initial Docker build/startup and health check. Confirm Flyway reaches V10 and Hibernate validation succeeds. Open the service's assigned **HTTPS** URL. The current public deployment is [pawtrack-demo.onrender.com](https://pawtrack-demo.onrender.com/).
 6. Check direct page loads/refreshes for `/cats/1`, `/login`, `/applications` and `/staff/care`. Use the existing fake accounts from the README to run public browsing, adopter application/list/receipt, other-adopter 404, STAFF review/care resolution and logout. In browser network tools, verify API/media requests use the same host, cookies are Secure, and CSRF-protected writes still work.
 7. Upload a small JPEG/PNG as STAFF and confirm its public portrait loads. Confirm ADOPTER cannot upload. Treat the uploaded file as temporary and use only fake inputs.
 
@@ -82,11 +102,11 @@ Local verification on 2026-09-10 (Windows, Java 21, Maven 3.9.11, Node 24.11.1):
 
 Docker image gate verification: the repository-root `docker build` completed successfully with the unchanged Dockerfile. The final Linux image ran as UID/GID 999 (`pawtrack`) against a fresh PostgreSQL 16 container using `demo-cloud`; Flyway applied all ten migrations and `/actuator/health` returned `UP`. The packaged SPA deep link and six seeded cats were also verified. Local Docker Desktop used a task-specific bridge network and loopback port 19093; the Ubuntu CI job uses host networking to reach its published PostgreSQL service port. Both local containers, their anonymous volumes and the test network were removed afterward. No image was pushed. YAML/actionlint and extracted Bash syntax checks passed.
 
-**Not verified:** this P5.2 revision and its new Docker job have not been pushed or executed on GitHub-hosted runners, and no Render deployment was performed. First hosted CI/deploy must still confirm the runner's service networking and Render forwarded headers/TLS/cookies, free-plan memory, health checks, cold starts, Blueprint synchronization and reset/upload-loss behavior.
+**Hosted status:** the public Render deployment and the external HTTPS/session behavior are now verified within the [hosted smoke-check scope](#hosted-verification). The historical local checks above remain separate evidence. Current deployed-commit/CI provenance, internal Render configuration, cold starts, capacity and reset/upload-loss behavior are not established by this smoke check.
 
 `npm ci` still reports the existing 20 dependency vulnerabilities recorded in P5.1; no dependency upgrade or automatic fix was included in deployment configuration.
 
-No deployment was performed, no provider other than Render was added, and no production-security, full penetration-test, production load, real-data privacy or durability guarantee is claimed. Object storage, production configuration, registration and later milestones remain deferred.
+The public Render demo is live; no provider other than Render was added. No production-security, full penetration-test, production load, real-data privacy or durability guarantee is claimed. Object storage, production configuration, registration and later milestones remain deferred.
 
 ## Files changed
 
