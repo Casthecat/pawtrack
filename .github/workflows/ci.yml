@@ -13,6 +13,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docker-image:
+    name: Docker / image build and PostgreSQL startup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: pawtrack_portfolio_demo
+          POSTGRES_USER: pawtrack
+          POSTGRES_PASSWORD: pawtrack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pawtrack -d pawtrack_portfolio_demo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build repository-root Dockerfile (local image only)
+        run: docker build --file Dockerfile --tag pawtrack:ci .
+      - name: Start image with disposable CI PostgreSQL
+        # Host networking on this Linux runner reaches the service's published port.
+        run: |
+          docker run --detach --name pawtrack-ci --network host \
+            --env SPRING_PROFILES_ACTIVE=demo-cloud \
+            --env PAWTRACK_DEMO_DATABASE_ACK=I_ACKNOWLEDGE_THIS_DATABASE_IS_DISPOSABLE \
+            --env DB_HOST=127.0.0.1 --env DB_PORT=5432 \
+            --env DB_NAME=pawtrack_portfolio_demo \
+            --env DB_USER=pawtrack --env DB_PASSWORD=pawtrack \
+            --env PORT=10000 \
+            pawtrack:ci
+      - name: Wait for healthy cloud-profile startup
+        run: |
+          for attempt in {1..60}; do
+            if [ "$(docker inspect --format '{{.State.Running}}' pawtrack-ci)" != true ]; then
+              echo 'PawTrack container exited before becoming healthy.' >&2
+              exit 1
+            fi
+            if curl --silent --fail --max-time 3 http://127.0.0.1:10000/actuator/health > "$RUNNER_TEMP/pawtrack-health.json"; then
+              python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["status"] == "UP"' "$RUNNER_TEMP/pawtrack-health.json"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'PawTrack did not become healthy within the startup window.' >&2
+          exit 1
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          if docker container inspect pawtrack-ci > /dev/null 2>&1; then
+            docker logs pawtrack-ci
+          fi
+      - name: Remove smoke-test container
+        if: always()
+        run: docker rm --force pawtrack-ci > /dev/null 2>&1 || true
+
   backend:
     name: Backend / isolated H2 regression
     runs-on: ubuntu-24.04
@@ -108,6 +168,8 @@ jobs:
           test
       - name: Four coordinated PostgreSQL row-lock execution histories
         run: bash ./mvnw --batch-mode --no-transfer-progress -Dtest=CatLockPostgresRuntimeIT test
+      - name: Disposable cloud profile, migration, restart and HTTPS session checks
+        run: bash ./mvnw --batch-mode --no-transfer-progress -Dtest=DemoCloudPostgresIT test
 
   live-demo:
     name: Live demo / real session, CSRF and ownership

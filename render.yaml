@@ -1,0 +1,46 @@
+# Public, disposable portfolio demo. No production credentials or persistent disk.
+services:
+  - type: web
+    name: pawtrack-demo
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo-cloud
+      - key: PAWTRACK_DEMO_DATABASE_ACK
+        value: I_ACKNOWLEDGE_THIS_DATABASE_IS_DISPOSABLE
+      - key: DB_HOST
+        fromDatabase:
+          name: pawtrack-demo-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: pawtrack-demo-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: pawtrack-demo-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: pawtrack-demo-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: pawtrack-demo-db
+          property: password
+
+databases:
+  - name: pawtrack-demo-db
+    databaseName: pawtrack_portfolio_demo
+    user: pawtrack_demo
+    postgresMajorVersion: '16'
+    plan: free
+    region: oregon
+    ipAllowList: []

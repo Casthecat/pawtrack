@@ -26,6 +26,10 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/**")
+                .addResourceLocations("classpath:/static/")
+                .resourceChain(true)
+                .addResolver(new SpaResourceResolver());
         Path path = Paths.get(uploadPath).toAbsolutePath().normalize();
         String location = path.toUri().toString();
         // A directory may not exist until the first upload; URI conversion then omits '/'.

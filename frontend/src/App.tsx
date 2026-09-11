@@ -19,7 +19,7 @@ export default function App() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [pathname])
   return <div className="app">
     <a className="skip-link" href="#main">Skip to content</a>
-    <div className="demo-banner">Portfolio demo · Use sample contact details. Staff workspace requires a staff account.</div>
+    <div className="demo-banner">Portfolio demo · Fake accounts only. Do not enter real applicant data. Uploaded photos are temporary.</div>
     <header className="site-header">
       <Link to="/" className="brand"><span className="brand-mark"><PawPrint size={23} /></span>PawTrack<span className="brand-dot">.</span></Link>
       <nav aria-label="Main navigation"><NavLink to="/" end>Meet the cats</NavLink><AccountNavigation /></nav>

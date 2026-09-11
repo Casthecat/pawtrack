@@ -43,7 +43,7 @@ export function LoginPage() {
       {login.isError && <p className="form-error" role="alert">{apiError(login.error)}</p>}
       <button className="button primary full-width" disabled={login.isPending || !email.trim() || !password}>{login.isPending ? 'Signing in…' : 'Sign in'}</button>
     </form>
-    <p className="muted">Local demo credentials are documented in the project README. Account registration is not available yet.</p>
+    <p className="muted">Portfolio demo credentials are documented in the project README. Account registration is not available yet.</p>
     <Link className="text-button" to="/">Continue browsing cats →</Link>
   </section>
 }
